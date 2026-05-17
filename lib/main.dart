@@ -388,11 +388,11 @@ class EventsScreen extends StatelessWidget {
   void _showAddEventDialog(BuildContext context) {
     bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
     final titleController = TextEditingController();
-    final descriptionController = TextEditingController(); // Поле опису замість балів
+    final descriptionController = TextEditingController(); 
+    final durationController = TextEditingController(text: "2"); // Поле тривалості з дефолтним "2"
     String? selectedType;
     DateTime? selectedDate;
     TimeOfDay? selectedTime;
-    String selectedDuration = "2 години";
 
     showDialog(
       context: context,
@@ -473,88 +473,143 @@ class EventsScreen extends StatelessWidget {
                       );
                     },
                   ),
-                  const SizedBox(height: 20),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.calendar_today, color: isDark ? Colors.white60 : Colors.black54),
-                    title: Text(
-                      selectedDate == null 
-                          ? "ОБРАТИ ДАТУ" 
-                          : "${selectedDate!.day.toString().padLeft(2, '0')}.${selectedDate!.month.toString().padLeft(2, '0')}.${selectedDate!.year}",
-                      style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14),
-                    ),
-                    onTap: () async {
-                      DateTime? picked = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime(2025),
-                        lastDate: DateTime(2030),
-                        locale: const Locale('uk', 'UA'),
-                        builder: (context, child) {
-                          return Theme(
-                            data: isDark 
-                                ? ThemeData.dark().copyWith(
-                                    colorScheme: const ColorScheme.dark(
-                                      primary: Colors.white,
-                                      onPrimary: Colors.black,
-                                      surface: Color(0xFF0A0A0A),
-                                      onSurface: Colors.white,
-                                    ),
-                                  )
-                                : ThemeData.light().copyWith(
-                                    colorScheme: const ColorScheme.light(
-                                      primary: Colors.black,
-                                      onPrimary: Colors.white,
-                                      surface: Colors.white,
-                                      onSurface: Colors.black,
-                                    ),
+                  const SizedBox(height: 25),
+                  
+                  // ЄДИНИЙ РЯДОК ДЛЯ ДАТИ, ЧАСУ ТА ТРИВАЛОСТІ
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // БЛОК 1: ДАТА
+                      Expanded(
+                        flex: 5,
+                        child: InkWell(
+                          onTap: () async {
+                            DateTime? picked = await showDatePicker(
+                              context: context,
+                              initialDate: DateTime.now(),
+                              firstDate: DateTime(2025),
+                              lastDate: DateTime(2030),
+                              locale: const Locale('uk', 'UA'),
+                              builder: (context, child) {
+                                return Theme(
+                                  data: isDark 
+                                      ? ThemeData.dark().copyWith(
+                                          colorScheme: const ColorScheme.dark(
+                                            primary: Colors.white,
+                                            onPrimary: Colors.black,
+                                            surface: Color(0xFF0A0A0A),
+                                            onSurface: Colors.white,
+                                          ),
+                                        )
+                                      : ThemeData.light().copyWith(
+                                          colorScheme: const ColorScheme.light(
+                                            primary: Colors.black,
+                                            onPrimary: Colors.white,
+                                            surface: Colors.white,
+                                            onSurface: Colors.black,
+                                          ),
+                                        ),
+                                  child: child!,
+                                );
+                              },
+                            );
+                            if (picked != null) {
+                              setDialogState(() => selectedDate = picked);
+                            }
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text("ДАТА", style: TextStyle(color: isDark ? Colors.white38 : Colors.black45, fontSize: 11, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(Icons.calendar_today, size: 16, color: isDark ? Colors.white60 : Colors.black54),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    selectedDate == null 
+                                        ? "ОБРАТИ" 
+                                        : "${selectedDate!.day.toString().padLeft(2, '0')}.${selectedDate!.month.toString().padLeft(2, '0')}",
+                                    style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14),
                                   ),
-                            child: child!,
-                          );
-                        },
-                      );
-                      if (picked != null) {
-                        setDialogState(() => selectedDate = picked);
-                      }
-                    },
-                  ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.access_time, color: isDark ? Colors.white60 : Colors.black54),
-                    title: Text(
-                      selectedTime == null 
-                          ? "ОБРАТИ ЧАС ПОЧАТКУ" 
-                          : selectedTime!.format(context),
-                      style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14),
-                    ),
-                    onTap: () async {
-                      TimeOfDay? pickedTime = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay.now(),
-                      );
-                      if (pickedTime != null) {
-                        setDialogState(() => selectedTime = pickedTime);
-                      }
-                    },
-                  ),
-                  DropdownButtonFormField<String>(
-                    dropdownColor: isDark ? const Color(0xFF121212) : Colors.white,
-                    value: selectedDuration,
-                    decoration: InputDecoration(
-                      labelText: "Тривалість заходу",
-                      labelStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.38) : Colors.black45, fontSize: 14),
-                    ),
-                    items: ["30 хвилин", "1 година", "1.5 години", "2 години", "3 години", "Весь день"]
-                        .map((label) => DropdownMenuItem(
-                              value: label,
-                              child: Text(label, style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-                            ))
-                        .toList(),
-                    onChanged: (val) {
-                      if (val != null) setDialogState(() => selectedDuration = val);
-                    },
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Container(height: 35, width: 1, color: isDark ? Colors.white12 : Colors.black12, margin: const EdgeInsets.symmetric(horizontal: 10)),
+                      
+                      // БЛОК 2: ЧАС
+                      Expanded(
+                        flex: 4,
+                        child: InkWell(
+                          onTap: () async {
+                            TimeOfDay? pickedTime = await showTimePicker(
+                              context: context,
+                              initialTime: TimeOfDay.now(),
+                            );
+                            if (pickedTime != null) {
+                              setDialogState(() => selectedTime = pickedTime);
+                            }
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text("ЧАС", style: TextStyle(color: isDark ? Colors.white38 : Colors.black45, fontSize: 11, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(Icons.access_time, size: 16, color: isDark ? Colors.white60 : Colors.black54),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    selectedTime == null 
+                                        ? "ОБРАТИ" 
+                                        : selectedTime!.format(context),
+                                    style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Container(height: 35, width: 1, color: isDark ? Colors.white12 : Colors.black12, margin: const EdgeInsets.symmetric(horizontal: 10)),
+                      
+                      // БЛОК 3: ТРИВАЛІСТЬ
+                      Expanded(
+                        flex: 5,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("ТРИВАЛІСТЬ (ГОД)", style: TextStyle(color: isDark ? Colors.white38 : Colors.black45, fontSize: 11, fontWeight: FontWeight.bold)),
+                            SizedBox(
+                              height: 32,
+                              child: TextField(
+                                controller: durationController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14),
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')), // Тільки цифри та розділювачі
+                                ],
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.only(top: 6),
+                                  hintText: "напр. 2.5",
+                                  hintStyle: TextStyle(color: isDark ? Colors.white24 : Colors.black26, fontSize: 13),
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 30),
+                  
                   Center(
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
@@ -565,13 +620,19 @@ class EventsScreen extends StatelessWidget {
                       ),
                       onPressed: () {
                         if (titleController.text.isNotEmpty && selectedType != null && selectedDate != null) {
+                          String enteredDuration = durationController.text.trim();
+                          if (enteredDuration.isEmpty) enteredDuration = "2"; // Захист від порожнього поля
+                          
+                          // Формуємо красивий текст для відображення в списку
+                          String formattedDuration = "$enteredDuration год.";
+
                           FirebaseFirestore.instance.collection('events').add({
                             'title': titleController.text.trim(),
                             'description': descriptionController.text.trim(),
                             'type': selectedType,
                             'date': Timestamp.fromDate(selectedDate!),
                             'time': selectedTime != null ? "${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}" : "Не вказано",
-                            'duration': selectedDuration,
+                            'duration': formattedDuration,
                             'active': true,
                           });
                           Navigator.pop(context);
