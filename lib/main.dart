@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 const firebaseOptions = FirebaseOptions(
   apiKey: "AIzaSyAv0cWrxWEV-FQwjoKKOwxuYf5wusF-wZc",
@@ -47,6 +48,16 @@ class MyApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           scrollBehavior: AppScrollBehavior(),
           themeMode: currentMode,
+          // Додаємо делегати локалізації для відображення календаря українською мовою
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('uk', 'UA'), // Українська
+            Locale('en', 'US'),
+          ],
           theme: ThemeData(
             brightness: Brightness.light,
             scaffoldBackgroundColor: const Color(0xFFF5F5F7),
@@ -258,7 +269,6 @@ class _MainShellState extends State<MainShell> {
             const EventsScreen(isAdmin: false),
             ResidentScreen(
               name: widget.userData?['name'] ?? '', 
-              points: widget.userData?['points'] ?? 0,
               userCode: widget.userCode,
               onOpenSettings: () => _showProfileBottomSheet(context),
             ),
@@ -378,22 +388,25 @@ class EventsScreen extends StatelessWidget {
     );
   }
 
+  // Оновлене вікно OVL-DLG-ADD-EV (Створення заходу з вибором часу, тривалості та українським календарем)
   void _showAddEventDialog(BuildContext context) {
     bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
     final titleController = TextEditingController();
-    final priceController = TextEditingController();
+    final descriptionController = TextEditingController(); // Замість балів тепер поле Опису
     String? selectedType;
     DateTime? selectedDate;
+    TimeOfDay? selectedTime;
+    String selectedDuration = "2 години"; // Значення тривалості за замовчуванням
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => Dialog(
-          backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: SingleChildScrollView(
+      builder: (context) => Dialog(
+        backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: StatefulBuilder(
+            builder: (context, setDialogState) => SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -420,11 +433,11 @@ class EventsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 15),
                   TextField(
-                    controller: priceController,
+                    controller: descriptionController,
                     style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                    keyboardType: TextInputType.number,
+                    keyboardType: TextInputType.text,
                     decoration: InputDecoration(
-                      labelText: "Вартість (бали)", 
+                      labelText: "Короткий опис заходу", 
                       labelStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38)
                     ),
                   ),
@@ -465,7 +478,8 @@ class EventsScreen extends StatelessWidget {
                       );
                     },
                   ),
-                  const SizedBox(height: 25),
+                  const SizedBox(height: 20),
+                  // Календар українською мовою завдяки locale: Locale('uk', 'UA')
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(Icons.calendar_today, color: isDark ? Colors.white60 : Colors.black54),
@@ -481,6 +495,7 @@ class EventsScreen extends StatelessWidget {
                         initialDate: DateTime.now(),
                         firstDate: DateTime(2025),
                         lastDate: DateTime(2030),
+                        locale: const Locale('uk', 'UA'), // Українська мова календаря
                         builder: (context, child) {
                           return Theme(
                             data: isDark 
@@ -511,6 +526,50 @@ class EventsScreen extends StatelessWidget {
                       }
                     },
                   ),
+                  // Нове поле: Обирати Час
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.access_time, color: isDark ? Colors.white60 : Colors.black54),
+                    title: Text(
+                      selectedTime == null 
+                          ? "ОБРАТИ ЧАС ПОЧАТКУ" 
+                          : selectedTime!.format(context),
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14),
+                    ),
+                    onTap: () async {
+                      TimeOfDay? pickedTime = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
+                        builder: (context, child) {
+                          return Theme(
+                            data: isDark ? ThemeData.dark() : ThemeData.light(),
+                            child: child!,
+                          );
+                        },
+                      );
+                      if (pickedTime != null) {
+                        setDialogState(() => selectedTime = pickedTime);
+                      }
+                    },
+                  ),
+                  // Нове поле: Тривалість заходу
+                  DropdownButtonFormField<String>(
+                    dropdownColor: isDark ? const Color(0xFF121212) : Colors.white,
+                    value: selectedDuration,
+                    decoration: InputDecoration(
+                      labelText: "Тривалість заходу",
+                      labelStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.38) : Colors.black45, fontSize: 14),
+                    ),
+                    items: ["30 хвилин", "1 година", "1.5 години", "2 години", "3 години", "Весь день"]
+                        .map((label) => DropdownMenuItem(
+                              value: label,
+                              child: Text(label, style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+                            ))
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null) setDialogState(() => selectedDuration = val);
+                    },
+                  ),
                   const SizedBox(height: 30),
                   Center(
                     child: ElevatedButton(
@@ -524,9 +583,11 @@ class EventsScreen extends StatelessWidget {
                         if (titleController.text.isNotEmpty && selectedType != null && selectedDate != null) {
                           FirebaseFirestore.instance.collection('events').add({
                             'title': titleController.text.trim(),
-                            'price': int.tryParse(priceController.text.trim()) ?? 0,
+                            'description': descriptionController.text.trim(),
                             'type': selectedType,
                             'date': Timestamp.fromDate(selectedDate!),
+                            'time': selectedTime != null ? "${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}" : "Не вказано",
+                            'duration': selectedDuration,
                             'active': true,
                           });
                           Navigator.pop(context);
@@ -581,6 +642,15 @@ class EventsScreen extends StatelessWidget {
                       dateStr = " | ${ev['date'].toString()}";
                     }
                   }
+                  
+                  // Читаємо час та тривалість із бази даних (якщо існують)
+                  Map<String, dynamic> data = ev.data() as Map<String, dynamic>;
+                  String timeStr = data.containsKey('time') ? " о ${data['time']}" : "";
+                  String durationStr = data.containsKey('duration') ? " (${data['duration']})" : "";
+                  String descStr = data.containsKey('description') && data['description'].toString().isNotEmpty 
+                      ? data['description'].toString().toUpperCase() 
+                      : ev['type'].toString().toUpperCase();
+                  
                   String typeStr = ev['type'] != null ? "[${ev['type'].toString().toUpperCase()}] " : "";
                   
                   return Container(
@@ -599,7 +669,8 @@ class EventsScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text("$typeStr${ev['title'].toString().toUpperCase()}", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                              Text("${ev['price']} БАЛІВ$dateStr", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38, fontSize: 12)),
+                              // Тут виводимо опис, дату, час та тривалість замість БАЛІВ
+                              Text("$descStr$dateStr$timeStr$durationStr", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38, fontSize: 12)),
                             ],
                           ),
                         ),
@@ -731,7 +802,6 @@ class _AdminScreenState extends State<AdminScreen> {
                     await FirebaseFirestore.instance.collection('residents').doc(_cCtrl.text.trim()).set({
                       'name': _nCtrl.text.trim(),
                       'role': _role,
-                      'points': _role == 'resident' ? 0 : null,
                     });
                     _nCtrl.clear(); _cCtrl.clear();
                   }, 
@@ -844,14 +914,12 @@ class _AdminTypesScreenState extends State<AdminTypesScreen> {
 // Код компонента: RES-TAB-PROFILE
 class ResidentScreen extends StatelessWidget {
   final String name;
-  final dynamic points;
   final String userCode;
   final VoidCallback onOpenSettings;
 
   const ResidentScreen({
     super.key, 
     required this.name, 
-    this.points, 
     required this.userCode,
     required this.onOpenSettings
   });
@@ -881,8 +949,6 @@ class ResidentScreen extends StatelessWidget {
                   children: [
                     Text(name.toUpperCase(), style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 18, letterSpacing: 2, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 10),
-                    Text("${points ?? 0} БАЛІВ", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.5) : Colors.black54, fontSize: 15)),
-                    const SizedBox(height: 4),
                     Text("КОД: $userCode", style: TextStyle(color: isDark ? Colors.white24 : Colors.black26, fontSize: 12)),
                   ],
                 ),
@@ -915,7 +981,6 @@ class AttacheScreen extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 100),
                 children: snapshot.data!.docs.map((d) => ListTile(
                   title: Text(d['name'], style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-                  subtitle: Text("БАЛИ: ${d['points']}", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38)),
                 )).toList(),
               );
             },
