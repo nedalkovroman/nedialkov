@@ -48,16 +48,17 @@ class MyApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           scrollBehavior: AppScrollBehavior(),
           themeMode: currentMode,
-          // Додаємо делегати локалізації для відображення календаря українською мовою
+          // Підключаємо делегати для роботи української мови в календарі
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
           supportedLocales: const [
-            Locale('uk', 'UA'), // Українська
+            Locale('uk', 'UA'),
             Locale('en', 'US'),
           ],
+          locale: const Locale('uk', 'UA'), // Основна локалізація за замовчуванням
           theme: ThemeData(
             brightness: Brightness.light,
             scaffoldBackgroundColor: const Color(0xFFF5F5F7),
@@ -97,7 +98,7 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: 1); // Початкова сторінка — центр
+    _pageController = PageController(initialPage: 1);
   }
 
   @override
@@ -107,7 +108,6 @@ class _MainShellState extends State<MainShell> {
     super.dispose();
   }
 
-  // Обробка стрілочок на ПК
   void _handleKeyEvent(KeyEvent event) {
     if (event is KeyDownEvent) {
       if (event.logicalKey == LogicalKeyboardKey.arrowLeft && _currentIndex > 0) {
@@ -118,7 +118,6 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
-  // Діалог для зміни коду доступу (Код компонента: OVL-DLG-CHG-CODE)
   void _showChangeCodeDialog(BuildContext context, bool isDark) {
     final newCodeController = TextEditingController();
     showDialog(
@@ -164,7 +163,6 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  // Шторка налаштувань профілю (Код компонента: OVL-BSH-PROFILE)
   void _showProfileBottomSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -339,7 +337,6 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-// Компоненти: RES-TAB-EVENTS, ATT-TAB-EVENTS, ADM-TAB-EVENTS
 class EventsScreen extends StatelessWidget {
   final bool isAdmin;
   const EventsScreen({super.key, required this.isAdmin});
@@ -388,25 +385,24 @@ class EventsScreen extends StatelessWidget {
     );
   }
 
-  // Оновлене вікно OVL-DLG-ADD-EV (Створення заходу з вибором часу, тривалості та українським календарем)
   void _showAddEventDialog(BuildContext context) {
     bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
     final titleController = TextEditingController();
-    final descriptionController = TextEditingController(); // Замість балів тепер поле Опису
+    final descriptionController = TextEditingController(); // Поле опису замість балів
     String? selectedType;
     DateTime? selectedDate;
     TimeOfDay? selectedTime;
-    String selectedDuration = "2 години"; // Значення тривалості за замовчуванням
+    String selectedDuration = "2 години";
 
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: StatefulBuilder(
-            builder: (context, setDialogState) => SingleChildScrollView(
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => Dialog(
+          backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,7 +431,6 @@ class EventsScreen extends StatelessWidget {
                   TextField(
                     controller: descriptionController,
                     style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                    keyboardType: TextInputType.text,
                     decoration: InputDecoration(
                       labelText: "Короткий опис заходу", 
                       labelStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38)
@@ -479,7 +474,6 @@ class EventsScreen extends StatelessWidget {
                     },
                   ),
                   const SizedBox(height: 20),
-                  // Календар українською мовою завдяки locale: Locale('uk', 'UA')
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(Icons.calendar_today, color: isDark ? Colors.white60 : Colors.black54),
@@ -495,7 +489,7 @@ class EventsScreen extends StatelessWidget {
                         initialDate: DateTime.now(),
                         firstDate: DateTime(2025),
                         lastDate: DateTime(2030),
-                        locale: const Locale('uk', 'UA'), // Українська мова календаря
+                        locale: const Locale('uk', 'UA'),
                         builder: (context, child) {
                           return Theme(
                             data: isDark 
@@ -506,7 +500,6 @@ class EventsScreen extends StatelessWidget {
                                       surface: Color(0xFF0A0A0A),
                                       onSurface: Colors.white,
                                     ),
-                                    dialogBackgroundColor: const Color(0xFF0A0A0A),
                                   )
                                 : ThemeData.light().copyWith(
                                     colorScheme: const ColorScheme.light(
@@ -515,7 +508,6 @@ class EventsScreen extends StatelessWidget {
                                       surface: Colors.white,
                                       onSurface: Colors.black,
                                     ),
-                                    dialogBackgroundColor: Colors.white,
                                   ),
                             child: child!,
                           );
@@ -526,7 +518,6 @@ class EventsScreen extends StatelessWidget {
                       }
                     },
                   ),
-                  // Нове поле: Обирати Час
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(Icons.access_time, color: isDark ? Colors.white60 : Colors.black54),
@@ -540,19 +531,12 @@ class EventsScreen extends StatelessWidget {
                       TimeOfDay? pickedTime = await showTimePicker(
                         context: context,
                         initialTime: TimeOfDay.now(),
-                        builder: (context, child) {
-                          return Theme(
-                            data: isDark ? ThemeData.dark() : ThemeData.light(),
-                            child: child!,
-                          );
-                        },
                       );
                       if (pickedTime != null) {
                         setDialogState(() => selectedTime = pickedTime);
                       }
                     },
                   ),
-                  // Нове поле: Тривалість заходу
                   DropdownButtonFormField<String>(
                     dropdownColor: isDark ? const Color(0xFF121212) : Colors.white,
                     value: selectedDuration,
@@ -643,7 +627,6 @@ class EventsScreen extends StatelessWidget {
                     }
                   }
                   
-                  // Читаємо час та тривалість із бази даних (якщо існують)
                   Map<String, dynamic> data = ev.data() as Map<String, dynamic>;
                   String timeStr = data.containsKey('time') ? " о ${data['time']}" : "";
                   String durationStr = data.containsKey('duration') ? " (${data['duration']})" : "";
@@ -669,7 +652,6 @@ class EventsScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text("$typeStr${ev['title'].toString().toUpperCase()}", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                              // Тут виводимо опис, дату, час та тривалість замість БАЛІВ
                               Text("$descStr$dateStr$timeStr$durationStr", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38, fontSize: 12)),
                             ],
                           ),
@@ -688,7 +670,6 @@ class EventsScreen extends StatelessWidget {
   }
 }
 
-// Код компонента: AUTH-GATE
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
   @override
@@ -762,7 +743,6 @@ class _AuthGateState extends State<AuthGate> {
   }
 }
 
-// Код компонента: ADM-TAB-USERS
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
   @override
@@ -830,10 +810,8 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 }
 
-// Код компонента: ADM-TAB-TYPES
 class AdminTypesScreen extends StatefulWidget {
   const AdminTypesScreen({super.key});
-
   @override
   State<AdminTypesScreen> createState() => _AdminTypesScreenState();
 }
@@ -911,7 +889,6 @@ class _AdminTypesScreenState extends State<AdminTypesScreen> {
   }
 }
 
-// Код компонента: RES-TAB-PROFILE
 class ResidentScreen extends StatelessWidget {
   final String name;
   final String userCode;
@@ -961,7 +938,6 @@ class ResidentScreen extends StatelessWidget {
   }
 }
 
-// Код компонента: ATT-TAB-RESIDENTS
 class AttacheScreen extends StatelessWidget {
   const AttacheScreen({super.key});
   @override
