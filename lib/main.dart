@@ -695,6 +695,8 @@ class EventsScreen extends StatelessWidget {
                       ? data['description'].toString().toUpperCase() 
                       : ev['type'].toString().toUpperCase();
                   
+                  // Змінна typeStr залишається для уникнення видалення коду, але не використовується у назві події
+                  // ignore: unused_local_variable
                   String typeStr = ev['type'] != null ? "[${ev['type'].toString().toUpperCase()}] " : "";
                   
                   return Container(
@@ -712,7 +714,7 @@ class EventsScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text("$typeStr${ev['title'].toString().toUpperCase()}", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                              Text("${ev['title'].toString().toUpperCase()}", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, letterSpacing: 1)),
                               Text("$descStr$dateStr$timeStr$durationStr", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38, fontSize: 12)),
                             ],
                           ),
