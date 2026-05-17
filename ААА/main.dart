@@ -624,7 +624,7 @@ class EventsScreen extends StatelessWidget {
                           if (enteredDuration.isEmpty) enteredDuration = "2"; // Захист від порожнього поля
                           
                           // Формуємо красивий текст для відображення в списку
-                          String formattedDuration = "$enteredDuration год.";
+                          String formattedDuration = "$enteredDuration god.";
 
                           FirebaseFirestore.instance.collection('events').add({
                             'title': titleController.text.trim(),
@@ -638,7 +638,7 @@ class EventsScreen extends StatelessWidget {
                           Navigator.pop(context);
                         }
                       },
-                      child: const Text("СТВОРИТИ ЗАХІД", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                      child: const Text("СТВОРЕННЯ ЗАХОДУ", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
                     ),
                   )
                 ],
@@ -682,19 +682,23 @@ class EventsScreen extends StatelessWidget {
                   if (ev['date'] != null) {
                     if (ev['date'] is Timestamp) {
                       DateTime dt = (ev['date'] as Timestamp).toDate();
-                      dateStr = " | ${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year}";
+                      dateStr = "${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year}";
                     } else {
-                      dateStr = " | ${ev['date'].toString()}";
+                      dateStr = ev['date'].toString();
                     }
                   }
                   
                   Map<String, dynamic> data = ev.data() as Map<String, dynamic>;
-                  String timeStr = data.containsKey('time') ? " о ${data['time']}" : "";
+                  String timeStr = data.containsKey('time') ? " o ${data['time']}" : "";
                   String durationStr = data.containsKey('duration') ? " (${data['duration']})" : "";
-                  String descStr = data.containsKey('description') && data['description'].toString().isNotEmpty 
-                      ? data['description'].toString().toUpperCase() 
-                      : ev['type'].toString().toUpperCase();
                   
+                  // Робимо так, щоб префікс типу не вилазив, якщо опис порожній
+                  String descStr = data.containsKey('description') && data['description'].toString().isNotEmpty 
+                      ? "${data['description'].toString().toUpperCase()} | " 
+                      : "";
+                  
+                  // Змінна typeStr залишається для уникнення видалення коду, але ніде не виводиться в інтерфейс
+                  // ignore: unused_local_variable
                   String typeStr = ev['type'] != null ? "[${ev['type'].toString().toUpperCase()}] " : "";
                   
                   return Container(
@@ -712,7 +716,7 @@ class EventsScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text("$typeStr${ev['title'].toString().toUpperCase()}", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                              Text("${ev['title'].toString().toUpperCase()}", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, letterSpacing: 1)),
                               Text("$descStr$dateStr$timeStr$durationStr", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38, fontSize: 12)),
                             ],
                           ),

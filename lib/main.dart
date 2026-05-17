@@ -14,8 +14,8 @@ const firebaseOptions = FirebaseOptions(
   appId: "1:344209174163:web:9aaa3df05e307abd6b2766",
 );
 
-// Глобальний нотифікатор для зміни теми (День/Ніч)
-final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
+// Глобальний нотифікатор для зміни теми (Першочергово — Світла)
+final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,7 +48,6 @@ class MyApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           scrollBehavior: AppScrollBehavior(),
           themeMode: currentMode,
-          // Підключаємо делегати для роботи української мови в календарі
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
@@ -58,7 +57,7 @@ class MyApp extends StatelessWidget {
             Locale('uk', 'UA'),
             Locale('en', 'US'),
           ],
-          locale: const Locale('uk', 'UA'), // Основна локалізація за замовчуванням
+          locale: const Locale('uk', 'UA'),
           theme: ThemeData(
             brightness: Brightness.light,
             scaffoldBackgroundColor: const Color(0xFFF5F5F7),
@@ -91,7 +90,7 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  int _currentIndex = 1; // Запуск на центральній сторінці (Заходи)
+  int _currentIndex = 1; 
   late PageController _pageController;
   final FocusNode _keyboardFocusNode = FocusNode();
 
@@ -385,11 +384,293 @@ class EventsScreen extends StatelessWidget {
     );
   }
 
+  void _showEditEventDialog(BuildContext context, DocumentSnapshot eventDoc) {
+    bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+    Map<String, dynamic> data = eventDoc.data() as Map<String, dynamic>;
+    
+    final titleController = TextEditingController(text: data['title']?.toString() ?? "");
+    final descriptionController = TextEditingController(text: data['description']?.toString() ?? ""); 
+    
+    String rawDuration = "2";
+    if (data['duration'] != null) {
+      rawDuration = data['duration'].toString().replaceAll(" god.", "").trim();
+    }
+    final durationController = TextEditingController(text: rawDuration);
+    
+    String? selectedType = data['type']?.toString();
+    DateTime? selectedDate;
+    if (data['date'] != null && data['date'] is Timestamp) {
+      selectedDate = (data['date'] as Timestamp).toDate();
+    }
+    
+    TimeOfDay? selectedTime;
+    if (data['time'] != null && data['time'].toString().contains(":")) {
+      try {
+        final parts = data['time'].toString().split(":");
+        selectedTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+      } catch (_) {}
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => Dialog(
+          backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.close, color: isDark ? Colors.white : Colors.black),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      Text("РЕДАГУВАННЯ ЗАХОДУ", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, letterSpacing: 1, fontSize: 16)),
+                      IconButton(
+                        icon: const Icon(Icons.delete_forever, color: Colors.redAccent),
+                        onPressed: () async {
+                          await eventDoc.reference.delete();
+                          if (context.mounted) Navigator.pop(context);
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: titleController,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                    decoration: InputDecoration(
+                      labelText: "Назва заходу", 
+                      labelStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38)
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: descriptionController,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                    decoration: InputDecoration(
+                      labelText: "Короткий опис заходу", 
+                      labelStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38)
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance.collection('event_types').snapshots(),
+                    builder: (context, snapshot) {
+                      List<DropdownMenuItem<String>> items = [];
+                      if (snapshot.hasData) {
+                        items = snapshot.data!.docs.map((d) {
+                          return DropdownMenuItem<String>(
+                            value: d['name'].toString(),
+                            child: Text(d['name'].toString().toUpperCase(), style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+                          );
+                        }).toList();
+                      }
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              dropdownColor: isDark ? const Color(0xFF121212) : Colors.white,
+                              value: selectedType,
+                              hint: Text("ОБЕРІТЬ ТИП", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black26, fontSize: 14)),
+                              items: items,
+                              onChanged: (val) => setDialogState(() => selectedType = val),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          IconButton(
+                            icon: Icon(Icons.add_box_outlined, color: isDark ? Colors.white70 : Colors.black87),
+                            onPressed: () => _showCreateTypeDialog(context, isDark, (newTypeName) {
+                              setDialogState(() {
+                                selectedType = newTypeName; 
+                              });
+                            }),
+                          )
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 25),
+                  
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: InkWell(
+                          onTap: () async {
+                            DateTime? picked = await showDatePicker(
+                              context: context,
+                              initialDate: selectedDate ?? DateTime.now(),
+                              firstDate: DateTime(2025),
+                              lastDate: DateTime(2030),
+                              locale: const Locale('uk', 'UA'),
+                              builder: (context, child) {
+                                return Theme(
+                                  data: isDark 
+                                      ? ThemeData.dark().copyWith(
+                                          colorScheme: const ColorScheme.dark(
+                                            primary: Colors.white,
+                                            onPrimary: Colors.black,
+                                            surface: Color(0xFF0A0A0A),
+                                            onSurface: Colors.white,
+                                          ),
+                                        )
+                                      : ThemeData.light().copyWith(
+                                          colorScheme: const ColorScheme.light(
+                                            primary: Colors.black,
+                                            onPrimary: Colors.white,
+                                            surface: Colors.white,
+                                            onSurface: Colors.black,
+                                          ),
+                                        ),
+                                  child: child!,
+                                );
+                              },
+                            );
+                            if (picked != null) {
+                              setDialogState(() => selectedDate = picked);
+                            }
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text("ДАТА", style: TextStyle(color: isDark ? Colors.white38 : Colors.black45, fontSize: 11, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(Icons.calendar_today, size: 16, color: isDark ? Colors.white60 : Colors.black54),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    selectedDate == null 
+                                        ? "ОБРАТИ" 
+                                        : "${selectedDate!.day.toString().padLeft(2, '0')}.${selectedDate!.month.toString().padLeft(2, '0')}",
+                                    style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Container(height: 35, width: 1, color: isDark ? Colors.white12 : Colors.black12, margin: const EdgeInsets.symmetric(horizontal: 10)),
+                      
+                      Expanded(
+                        flex: 4,
+                        child: InkWell(
+                          onTap: () async {
+                            TimeOfDay? pickedTime = await showTimePicker(
+                              context: context,
+                              initialTime: selectedTime ?? TimeOfDay.now(),
+                            );
+                            if (pickedTime != null) {
+                              setDialogState(() => selectedTime = pickedTime);
+                            }
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text("ЧАС", style: TextStyle(color: isDark ? Colors.white38 : Colors.black45, fontSize: 11, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(Icons.access_time, size: 16, color: isDark ? Colors.white60 : Colors.black54),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    selectedTime == null 
+                                        ? "ОБРАТИ" 
+                                        : selectedTime!.format(context),
+                                    style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Container(height: 35, width: 1, color: isDark ? Colors.white12 : Colors.black12, margin: const EdgeInsets.symmetric(horizontal: 10)),
+                      
+                      Expanded(
+                        flex: 5,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("ТРИВАЛІСТЬ (ГОД)", style: TextStyle(color: isDark ? Colors.white38 : Colors.black45, fontSize: 11, fontWeight: FontWeight.bold)),
+                            SizedBox(
+                              height: 32,
+                              child: TextField(
+                                controller: durationController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14),
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')), 
+                                ],
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.only(top: 6),
+                                  hintText: "напр. 2.5",
+                                  hintStyle: TextStyle(color: isDark ? Colors.white24 : Colors.black26, fontSize: 13),
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+                  
+                  Center(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDark ? Colors.white10 : Colors.black12,
+                        foregroundColor: isDark ? Colors.white : Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                      ),
+                      onPressed: () async {
+                        if (titleController.text.isNotEmpty && selectedType != null && selectedDate != null) {
+                          String enteredDuration = durationController.text.trim();
+                          if (enteredDuration.isEmpty) enteredDuration = "2";
+                          String formattedDuration = "$enteredDuration god.";
+
+                          await eventDoc.reference.update({
+                            'title': titleController.text.trim(),
+                            'description': descriptionController.text.trim(),
+                            'type': selectedType,
+                            'date': Timestamp.fromDate(selectedDate!),
+                            'time': selectedTime != null ? "${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}" : "Не вказано",
+                            'duration': formattedDuration,
+                          });
+                          if (context.mounted) Navigator.pop(context);
+                        }
+                      },
+                      child: const Text("ЗБЕРЕГТИ ЗМІНИ", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                    ),
+                  )
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showAddEventDialog(BuildContext context) {
     bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
     final titleController = TextEditingController();
     final descriptionController = TextEditingController(); 
-    final durationController = TextEditingController(text: "2"); // Поле тривалості з дефолтним "2"
+    final durationController = TextEditingController(text: "2");
     String? selectedType;
     DateTime? selectedDate;
     TimeOfDay? selectedTime;
@@ -475,11 +756,9 @@ class EventsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 25),
                   
-                  // ЄДИНИЙ РЯДОК ДЛЯ ДАТИ, ЧАСУ ТА ТРИВАЛОСТІ
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // БЛОК 1: ДАТА
                       Expanded(
                         flex: 5,
                         child: InkWell(
@@ -540,7 +819,6 @@ class EventsScreen extends StatelessWidget {
                       ),
                       Container(height: 35, width: 1, color: isDark ? Colors.white12 : Colors.black12, margin: const EdgeInsets.symmetric(horizontal: 10)),
                       
-                      // БЛОК 2: ЧАС
                       Expanded(
                         flex: 4,
                         child: InkWell(
@@ -576,7 +854,6 @@ class EventsScreen extends StatelessWidget {
                       ),
                       Container(height: 35, width: 1, color: isDark ? Colors.white12 : Colors.black12, margin: const EdgeInsets.symmetric(horizontal: 10)),
                       
-                      // БЛОК 3: ТРИВАЛІСТЬ
                       Expanded(
                         flex: 5,
                         child: Column(
@@ -590,7 +867,7 @@ class EventsScreen extends StatelessWidget {
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14),
                                 inputFormatters: [
-                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')), // Тільки цифри та розділювачі
+                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')), 
                                 ],
                                 decoration: InputDecoration(
                                   isDense: true,
@@ -621,9 +898,8 @@ class EventsScreen extends StatelessWidget {
                       onPressed: () {
                         if (titleController.text.isNotEmpty && selectedType != null && selectedDate != null) {
                           String enteredDuration = durationController.text.trim();
-                          if (enteredDuration.isEmpty) enteredDuration = "2"; // Захист від порожнього поля
+                          if (enteredDuration.isEmpty) enteredDuration = "2"; 
                           
-                          // Формуємо красивий текст для відображення в списку
                           String formattedDuration = "$enteredDuration god.";
 
                           FirebaseFirestore.instance.collection('events').add({
@@ -657,6 +933,7 @@ class EventsScreen extends StatelessWidget {
       builder: (context, currentMode, child) {
         bool isDark = currentMode == ThemeMode.dark || (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
         Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
+        String currentRole = context.userRole;
 
         return Scaffold(
           backgroundColor: dynamicBg,
@@ -692,14 +969,9 @@ class EventsScreen extends StatelessWidget {
                   String timeStr = data.containsKey('time') ? " o ${data['time']}" : "";
                   String durationStr = data.containsKey('duration') ? " (${data['duration']})" : "";
                   
-                  // Робимо так, щоб префікс типу не вилазив, якщо опис порожній
                   String descStr = data.containsKey('description') && data['description'].toString().isNotEmpty 
                       ? "${data['description'].toString().toUpperCase()} | " 
                       : "";
-                  
-                  // Змінна typeStr залишається для уникнення видалення коду, але ніде не виводиться в інтерфейс
-                  // ignore: unused_local_variable
-                  String typeStr = ev['type'] != null ? "[${ev['type'].toString().toUpperCase()}] " : "";
                   
                   return Container(
                     margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -721,7 +993,17 @@ class EventsScreen extends StatelessWidget {
                             ],
                           ),
                         ),
-                        if (isAdmin) IconButton(icon: Icon(Icons.delete_outline, color: isDark ? Colors.white.withOpacity(0.1) : Colors.black26), onPressed: () => ev.reference.delete())
+                        // Виправлено помилку з фото: тепер використовується чиста перевірка ролі через context
+                        if (isAdmin || currentRole == 'attache') 
+                          IconButton(
+                            icon: Icon(Icons.edit_note, color: isDark ? Colors.white.withOpacity(0.38) : Colors.black45, size: 24), 
+                            onPressed: () => _showEditEventDialog(context, ev)
+                          )
+                        else if (isAdmin)
+                          IconButton(
+                            icon: Icon(Icons.delete_outline, color: isDark ? Colors.white.withOpacity(0.1) : Colors.black12), 
+                            onPressed: () => ev.reference.delete()
+                          )
                       ],
                     ),
                   );
@@ -735,76 +1017,10 @@ class EventsScreen extends StatelessWidget {
   }
 }
 
-class AuthGate extends StatefulWidget {
-  const AuthGate({super.key});
-  @override
-  State<AuthGate> createState() => _AuthGateState();
-}
-
-class _AuthGateState extends State<AuthGate> {
-  final _codeController = TextEditingController();
-
-  void _login() async {
-    String code = _codeController.text.trim();
-    if (code == "0000") {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainShell(role: 'admin', userCode: "0000")));
-      return;
-    }
-    try {
-      var doc = await FirebaseFirestore.instance.collection('residents').doc(code).get();
-      if (doc.exists && mounted) {
-        String role = doc.data()?['role'] ?? 'resident';
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => MainShell(role: role, userData: doc.data(), userCode: code)));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Помилка бази: $e")),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeNotifier,
-      builder: (context, currentMode, child) {
-        bool isDark = currentMode == ThemeMode.dark || (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-        Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
-        return Scaffold(
-          backgroundColor: dynamicBg,
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text("NEDIÁLKOV", style: TextStyle(color: isDark ? Colors.white : Colors.black, letterSpacing: 8, fontSize: 20)),
-                const SizedBox(height: 40),
-                SizedBox(
-                  width: 250,
-                  child: TextField(
-                    controller: _codeController,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                    keyboardType: TextInputType.number, 
-                    onSubmitted: (_) => _login(), 
-                    decoration: InputDecoration(
-                      hintText: "ВВЕДІТЬ КОД", 
-                      hintStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black26),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                TextButton(
-                  onPressed: _login, 
-                  child: Text("УВІЙТИ", style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+extension ContextRoleExtension on BuildContext {
+  String get userRole {
+    final shell = findAncestorStateOfType<_MainShellState>();
+    return shell?.widget.role ?? 'resident';
   }
 }
 
@@ -858,11 +1074,38 @@ class _AdminScreenState extends State<AdminScreen> {
                     stream: FirebaseFirestore.instance.collection('residents').snapshots(),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                      return ListView(children: snapshot.data!.docs.map((d) => ListTile(
-                        title: Text(d['name'], style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-                        subtitle: Text("${d['role']} - ID: ${d.id}", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38)),
-                        trailing: IconButton(icon: Icon(Icons.delete, color: isDark ? Colors.white.withOpacity(0.1) : Colors.black12), onPressed: () => d.reference.delete()),
-                      )).toList());
+                      
+                      var allDocs = snapshot.data!.docs;
+                      var attacheDocs = allDocs.where((d) => d['role'] == 'attache').toList();
+                      var residentDocs = allDocs.where((d) => d['role'] != 'attache').toList();
+                      
+                      return ListView(
+                        children: [
+                          if (attacheDocs.isNotEmpty) ...[
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                              child: Text("АТАШЕ", style: TextStyle(color: isDark ? Colors.white60 : Colors.black54, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
+                            ),
+                            ...attacheDocs.map((d) => ListTile(
+                              title: Text(d['name'], style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+                              subtitle: Text("ID: ${d.id}", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38)),
+                              trailing: IconButton(icon: Icon(Icons.delete, color: isDark ? Colors.white.withOpacity(0.1) : Colors.black12), onPressed: () => d.reference.delete()),
+                            )),
+                            const Divider(color: Colors.white10),
+                          ],
+                          if (residentDocs.isNotEmpty) ...[
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                              child: Text("КЛІЄНТИ", style: TextStyle(color: isDark ? Colors.white60 : Colors.black54, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
+                            ),
+                            ...residentDocs.map((d) => ListTile(
+                              title: Text(d['name'], style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+                              subtitle: Text("ID: ${d.id}", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38)),
+                              trailing: IconButton(icon: Icon(Icons.delete, color: isDark ? Colors.white.withOpacity(0.1) : Colors.black12), onPressed: () => d.reference.delete()),
+                            )),
+                          ],
+                        ],
+                      );
                     },
                   ),
                 )
@@ -1025,6 +1268,79 @@ class AttacheScreen extends StatelessWidget {
                 )).toList(),
               );
             },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  final _codeController = TextEditingController();
+
+  void _login() async {
+    String code = _codeController.text.trim();
+    if (code == "0000") {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainShell(role: 'admin', userCode: "0000")));
+      return;
+    }
+    try {
+      var doc = await FirebaseFirestore.instance.collection('residents').doc(code).get();
+      if (doc.exists && mounted) {
+        String role = doc.data()?['role'] ?? 'resident';
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => MainShell(role: role, userData: doc.data(), userCode: code)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Помилка бази: $e")),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (context, currentMode, child) {
+        bool isDark = currentMode == ThemeMode.dark || (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+        Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
+        return Scaffold(
+          backgroundColor: dynamicBg,
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text("NEDIÁLKOV", style: TextStyle(color: isDark ? Colors.white : Colors.black, letterSpacing: 8, fontSize: 20)),
+                const SizedBox(height: 40),
+                SizedBox(
+                  width: 250,
+                  child: TextField(
+                    controller: _codeController,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                    keyboardType: TextInputType.number, 
+                    onSubmitted: (_) => _login(), 
+                    decoration: InputDecoration(
+                      hintText: "ВВЕДІТЬ КОД", 
+                      hintStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black26),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextButton(
+                  onPressed: _login, 
+                  child: Text("УВІЙТИ", style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+                ),
+              ],
+            ),
           ),
         );
       },
