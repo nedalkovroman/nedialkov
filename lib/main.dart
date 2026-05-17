@@ -587,7 +587,8 @@ class EventsScreen extends StatelessWidget {
                     margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      border: Border.all(color: isDark ? Colors.white.withOpacity(0.1) : Colors.black12), 
+                      color: isDark ? const Color(0xFF0E0E0E) : Colors.white,
+                      border: Border.all(color: isDark ? Colors.white.withOpacity(0.08) : Colors.black12), 
                       borderRadius: BorderRadius.circular(15)
                     ),
                     child: Row(
@@ -595,7 +596,7 @@ class EventsScreen extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start, 
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text("$typeStr${ev['title'].toString().toUpperCase()}", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, letterSpacing: 1)),
                               Text("${ev['price']} БАЛІВ$dateStr", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38, fontSize: 12)),
@@ -827,16 +828,16 @@ class _AdminTypesScreenState extends State<AdminTypesScreen> {
                             onPressed: () => d.reference.delete(),
                           ),
                         )).toList(),
-                  );
-                },
-              ),
-            )
-          ],
-        ),
-      ),
+                      );
+                    },
+                  ),
+                )
+              ],
+            ),
+          ),
+        );
+      },
     );
-  },
-);
   }
 }
 
