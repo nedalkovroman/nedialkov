@@ -87,16 +87,10 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: 1); // Початкова сторінка — центр
-    themeNotifier.addListener(_onThemeChanged);
-  }
-
-  void _onThemeChanged() {
-    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
-    themeNotifier.removeListener(_onThemeChanged);
     _pageController.dispose();
     _keyboardFocusNode.dispose();
     super.dispose();
@@ -232,100 +226,105 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-    Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
-    
-    List<Widget> screens = [];
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (context, currentMode, child) {
+        bool isDark = currentMode == ThemeMode.dark || (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+        Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
+        
+        List<Widget> screens = [];
 
-    if (widget.role == 'admin') {
-      screens = [
-        const AdminScreen(), 
-        const EventsScreen(isAdmin: true), 
-        const AdminTypesScreen()
-      ];
-    } else if (widget.role == 'attache') {
-      screens = [
-        Scaffold(
-          backgroundColor: dynamicBg,
-          body: Center(child: Text("ЧЕКІН", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.12) : Colors.black12))),
-        ), 
-        const EventsScreen(isAdmin: false), 
-        const AttacheScreen()
-      ];
-    } else {
-      screens = [
-        Scaffold(
-          backgroundColor: dynamicBg,
-          body: Center(child: Text("КВИТОК", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.12) : Colors.black12))),
-        ),
-        const EventsScreen(isAdmin: false),
-        ResidentScreen(
-          name: widget.userData?['name'] ?? '', 
-          points: widget.userData?['points'] ?? 0,
-          userCode: widget.userCode,
-          onOpenSettings: () => _showProfileBottomSheet(context),
-        ),
-      ];
-    }
+        if (widget.role == 'admin') {
+          screens = [
+            const AdminScreen(), 
+            const EventsScreen(isAdmin: true), 
+            const AdminTypesScreen()
+          ];
+        } else if (widget.role == 'attache') {
+          screens = [
+            Scaffold(
+              backgroundColor: dynamicBg,
+              body: Center(child: Text("ЧЕКІН", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.12) : Colors.black12))),
+            ), 
+            const EventsScreen(isAdmin: false), 
+            const AttacheScreen()
+          ];
+        } else {
+          screens = [
+            Scaffold(
+              backgroundColor: dynamicBg,
+              body: Center(child: Text("КВИТОК", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.12) : Colors.black12))),
+            ),
+            const EventsScreen(isAdmin: false),
+            ResidentScreen(
+              name: widget.userData?['name'] ?? '', 
+              points: widget.userData?['points'] ?? 0,
+              userCode: widget.userCode,
+              onOpenSettings: () => _showProfileBottomSheet(context),
+            ),
+          ];
+        }
 
-    return KeyboardListener(
-      focusNode: _keyboardFocusNode,
-      autofocus: true,
-      onKeyEvent: _handleKeyEvent,
-      child: Theme(
-        data: isDark 
-            ? ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black, canvasColor: Colors.black)
-            : ThemeData.light().copyWith(scaffoldBackgroundColor: const Color(0xFFF5F5F7), canvasColor: const Color(0xFFF5F5F7)),
-        child: Scaffold(
-          backgroundColor: dynamicBg,
-          body: Stack(
-            children: [
-              PageView(
-                controller: _pageController,
-                onPageChanged: (index) => setState(() => _currentIndex = index),
-                children: screens,
-              ),
-              
-              if (widget.role != 'resident')
-                Positioned(
-                  top: 40,
-                  right: 20,
-                  child: IconButton(
-                    icon: Icon(Icons.person_outline, color: isDark ? Colors.white.withOpacity(0.24) : Colors.black26, size: 28),
-                    onPressed: () => _showProfileBottomSheet(context),
+        return KeyboardListener(
+          focusNode: _keyboardFocusNode,
+          autofocus: true,
+          onKeyEvent: _handleKeyEvent,
+          child: Theme(
+            data: isDark 
+                ? ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black, canvasColor: Colors.black)
+                : ThemeData.light().copyWith(scaffoldBackgroundColor: const Color(0xFFF5F5F7), canvasColor: const Color(0xFFF5F5F7)),
+            child: Scaffold(
+              backgroundColor: dynamicBg,
+              body: Stack(
+                children: [
+                  PageView(
+                    controller: _pageController,
+                    onPageChanged: (index) => setState(() => _currentIndex = index),
+                    children: screens,
                   ),
-                ),
-
-              Positioned(
-                bottom: 40,
-                left: 0,
-                right: 0,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(3, (index) {
-                    bool isActive = _currentIndex == index;
-                    return GestureDetector(
-                      onTap: () => _pageController.animateToPage(index, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        margin: const EdgeInsets.symmetric(horizontal: 8),
-                        height: 4,
-                        width: isActive ? 24 : 4,
-                        decoration: BoxDecoration(
-                          color: isActive 
-                              ? (isDark ? Colors.white : Colors.black) 
-                              : (isDark ? Colors.white.withOpacity(0.1) : Colors.black12),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
+                  
+                  if (widget.role != 'resident')
+                    Positioned(
+                      top: 40,
+                      right: 20,
+                      child: IconButton(
+                        icon: Icon(Icons.person_outline, color: isDark ? Colors.white.withOpacity(0.24) : Colors.black26, size: 28),
+                        onPressed: () => _showProfileBottomSheet(context),
                       ),
-                    );
-                  }),
-                ),
+                    ),
+
+                  Positioned(
+                    bottom: 40,
+                    left: 0,
+                    right: 0,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(3, (index) {
+                        bool isActive = _currentIndex == index;
+                        return GestureDetector(
+                          onTap: () => _pageController.animateToPage(index, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            margin: const EdgeInsets.symmetric(horizontal: 8),
+                            height: 4,
+                            width: isActive ? 24 : 4,
+                            decoration: BoxDecoration(
+                              color: isActive 
+                                  ? (isDark ? Colors.white : Colors.black) 
+                                  : (isDark ? Colors.white.withOpacity(0.1) : Colors.black12),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -547,68 +546,72 @@ class EventsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-    Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (context, currentMode, child) {
+        bool isDark = currentMode == ThemeMode.dark || (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+        Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
 
-    return Scaffold(
-      backgroundColor: dynamicBg,
-      floatingActionButton: isAdmin ? Padding(
-        padding: const EdgeInsets.only(bottom: 60),
-        child: FloatingActionButton(
-          backgroundColor: isDark ? Colors.white.withOpacity(0.12) : Colors.black12,
-          onPressed: () => _showAddEventDialog(context),
-          child: Icon(Icons.add, color: isDark ? Colors.white : Colors.black),
-        ),
-      ) : null,
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('events').snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          var events = snapshot.data!.docs;
-          return ListView.builder(
-            padding: const EdgeInsets.only(top: 100, bottom: 100),
-            itemCount: events.length,
-            itemBuilder: (context, index) {
-              var ev = events[index];
-              String dateStr = "";
-if (ev['date'] != null) {
-  if (ev['date'] is Timestamp) {
-    DateTime dt = (ev['date'] as Timestamp).toDate();
-    dateStr = " | ${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year}";
-  } else {
-    // Якщо в базі раптом рядок, просто виводимо його як є, щоб додаток не падав
-    dateStr = " | ${ev['date'].toString()}";
-  }
-}
-              String typeStr = ev['type'] != null ? "[${ev['type'].toString().toUpperCase()}] " : "";
-              
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  border: Border.all(color: isDark ? Colors.white.withOpacity(0.1) : Colors.black12), 
-                  borderRadius: BorderRadius.circular(15)
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start, 
-                        children: [
-                          Text("$typeStr${ev['title'].toString().toUpperCase()}", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                          Text("${ev['price']} БАЛІВ$dateStr", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38, fontSize: 12)),
-                        ],
-                      ),
+        return Scaffold(
+          backgroundColor: dynamicBg,
+          floatingActionButton: isAdmin ? Padding(
+            padding: const EdgeInsets.only(bottom: 60),
+            child: FloatingActionButton(
+              backgroundColor: isDark ? Colors.white.withOpacity(0.12) : Colors.black12,
+              onPressed: () => _showAddEventDialog(context),
+              child: Icon(Icons.add, color: isDark ? Colors.white : Colors.black),
+            ),
+          ) : null,
+          body: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('events').snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+              var events = snapshot.data!.docs;
+              return ListView.builder(
+                padding: const EdgeInsets.only(top: 100, bottom: 100),
+                itemCount: events.length,
+                itemBuilder: (context, index) {
+                  var ev = events[index];
+                  String dateStr = "";
+                  if (ev['date'] != null) {
+                    if (ev['date'] is Timestamp) {
+                      DateTime dt = (ev['date'] as Timestamp).toDate();
+                      dateStr = " | ${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year}";
+                    } else {
+                      dateStr = " | ${ev['date'].toString()}";
+                    }
+                  }
+                  String typeStr = ev['type'] != null ? "[${ev['type'].toString().toUpperCase()}] " : "";
+                  
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: isDark ? Colors.white.withOpacity(0.1) : Colors.black12), 
+                      borderRadius: BorderRadius.circular(15)
                     ),
-                    if (isAdmin) IconButton(icon: Icon(Icons.delete_outline, color: isDark ? Colors.white.withOpacity(0.1) : Colors.black26), onPressed: () => ev.reference.delete())
-                  ],
-                ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start, 
+                            children: [
+                              Text("$typeStr${ev['title'].toString().toUpperCase()}", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                              Text("${ev['price']} БАЛІВ$dateStr", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                        if (isAdmin) IconButton(icon: Icon(Icons.delete_outline, color: isDark ? Colors.white.withOpacity(0.1) : Colors.black26), onPressed: () => ev.reference.delete())
+                      ],
+                    ),
+                  );
+                },
               );
             },
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -646,38 +649,43 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
-    bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-    Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
-    return Scaffold(
-      backgroundColor: dynamicBg,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text("NEDIÁLKOV", style: TextStyle(color: isDark ? Colors.white : Colors.black, letterSpacing: 8, fontSize: 20)),
-            const SizedBox(height: 40),
-            SizedBox(
-              width: 250,
-              child: TextField(
-                controller: _codeController,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                keyboardType: TextInputType.number, 
-                onSubmitted: (_) => _login(), 
-                decoration: InputDecoration(
-                  hintText: "ВВЕДІТЬ КОД", 
-                  hintStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black26),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (context, currentMode, child) {
+        bool isDark = currentMode == ThemeMode.dark || (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+        Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
+        return Scaffold(
+          backgroundColor: dynamicBg,
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text("NEDIÁLKOV", style: TextStyle(color: isDark ? Colors.white : Colors.black, letterSpacing: 8, fontSize: 20)),
+                const SizedBox(height: 40),
+                SizedBox(
+                  width: 250,
+                  child: TextField(
+                    controller: _codeController,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                    keyboardType: TextInputType.number, 
+                    onSubmitted: (_) => _login(), 
+                    decoration: InputDecoration(
+                      hintText: "ВВЕДІТЬ КОД", 
+                      hintStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black26),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 20),
+                TextButton(
+                  onPressed: _login, 
+                  child: Text("УВІЙТИ", style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+                ),
+              ],
             ),
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: _login, 
-              child: Text("УВІЙТИ", style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -696,52 +704,57 @@ class _AdminScreenState extends State<AdminScreen> {
 
   @override
   Widget build(BuildContext context) {
-    bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-    Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
-    return Scaffold(
-      backgroundColor: dynamicBg,
-      body: Padding(
-        padding: const EdgeInsets.only(top: 100, left: 20, right: 20),
-        child: Column(
-          children: [
-            TextField(controller: _nCtrl, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: InputDecoration(labelText: "ПІБ", labelStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38))),
-            TextField(controller: _cCtrl, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: InputDecoration(labelText: "КОД", labelStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38))),
-            Row(children: [
-              Radio(value: 'resident', groupValue: _role, onChanged: (v) => setState(() => _role = v!), activeColor: isDark ? Colors.white : Colors.black),
-              Text("Клієнт", style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-              const SizedBox(width: 20),
-              Radio(value: 'attache', groupValue: _role, onChanged: (v) => setState(() => _role = v!), activeColor: isDark ? Colors.white : Colors.black),
-              Text("Аташе", style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-            ]),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: isDark ? Colors.white.withOpacity(0.12) : Colors.black12, foregroundColor: isDark ? Colors.white : Colors.black),
-              onPressed: () async {
-                await FirebaseFirestore.instance.collection('residents').doc(_cCtrl.text.trim()).set({
-                  'name': _nCtrl.text.trim(),
-                  'role': _role,
-                  'points': _role == 'resident' ? 0 : null,
-                });
-                _nCtrl.clear(); _cCtrl.clear();
-              }, 
-              child: const Text("ЗБЕРЕГТИ")
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (context, currentMode, child) {
+        bool isDark = currentMode == ThemeMode.dark || (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+        Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
+        return Scaffold(
+          backgroundColor: dynamicBg,
+          body: Padding(
+            padding: const EdgeInsets.only(top: 100, left: 20, right: 20),
+            child: Column(
+              children: [
+                TextField(controller: _nCtrl, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: InputDecoration(labelText: "ПІБ", labelStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38))),
+                TextField(controller: _cCtrl, style: TextStyle(color: isDark ? Colors.white : Colors.black), decoration: InputDecoration(labelText: "КОД", labelStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38))),
+                Row(children: [
+                  Radio(value: 'resident', groupValue: _role, onChanged: (v) => setState(() => _role = v!), activeColor: isDark ? Colors.white : Colors.black),
+                  Text("Клієнт", style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+                  const SizedBox(width: 20),
+                  Radio(value: 'attache', groupValue: _role, onChanged: (v) => setState(() => _role = v!), activeColor: isDark ? Colors.white : Colors.black),
+                  Text("Аташе", style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+                ]),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: isDark ? Colors.white.withOpacity(0.12) : Colors.black12, foregroundColor: isDark ? Colors.white : Colors.black),
+                  onPressed: () async {
+                    await FirebaseFirestore.instance.collection('residents').doc(_cCtrl.text.trim()).set({
+                      'name': _nCtrl.text.trim(),
+                      'role': _role,
+                      'points': _role == 'resident' ? 0 : null,
+                    });
+                    _nCtrl.clear(); _cCtrl.clear();
+                  }, 
+                  child: const Text("ЗБЕРЕГТИ")
+                ),
+                const Divider(color: Colors.white10),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance.collection('residents').snapshots(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                      return ListView(children: snapshot.data!.docs.map((d) => ListTile(
+                        title: Text(d['name'], style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+                        subtitle: Text("${d['role']} - ID: ${d.id}", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38)),
+                        trailing: IconButton(icon: Icon(Icons.delete, color: isDark ? Colors.white.withOpacity(0.1) : Colors.black12), onPressed: () => d.reference.delete()),
+                      )).toList());
+                    },
+                  ),
+                )
+              ],
             ),
-            const Divider(color: Colors.white10),
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance.collection('residents').snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                  return ListView(children: snapshot.data!.docs.map((d) => ListTile(
-                    title: Text(d['name'], style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-                    subtitle: Text("${d['role']} - ID: ${d.id}", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38)),
-                    trailing: IconButton(icon: Icon(Icons.delete, color: isDark ? Colors.white.withOpacity(0.1) : Colors.black12), onPressed: () => d.reference.delete()),
-                  )).toList());
-                },
-              ),
-            )
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -759,58 +772,61 @@ class _AdminTypesScreenState extends State<AdminTypesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-    Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
-    return Scaffold(
-      backgroundColor: dynamicBg,
-      body: Padding(
-        padding: const EdgeInsets.only(top: 100, left: 20, right: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("КЕРУВАННЯ ТИПАМИ ЗАХОДІВ", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, letterSpacing: 1)),
-            const SizedBox(height: 20),
-            Row(
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (context, currentMode, child) {
+        bool isDark = currentMode == ThemeMode.dark || (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+        Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
+        return Scaffold(
+          backgroundColor: dynamicBg,
+          body: Padding(
+            padding: const EdgeInsets.only(top: 100, left: 20, right: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _typeController,
-                    style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                    decoration: InputDecoration(
-                      labelText: "Новий тип заходу",
-                      labelStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: isDark ? Colors.white12 : Colors.black12, foregroundColor: isDark ? Colors.white : Colors.black),
-                  onPressed: () async {
-                    if (_typeController.text.isNotEmpty) {
-                      await FirebaseFirestore.instance.collection('event_types').add({
-                        'name': _typeController.text.trim(),
-                      });
-                      _typeController.clear();
-                    }
-                  },
-                  child: const Text("ДОДАТИ"),
-                )
-              ],
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance.collection('event_types').snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                  return ListView(
-                    children: snapshot.data!.docs.map((d) => ListTile(
-                      title: Text(d['name'].toString().toUpperCase(), style: TextStyle(color: isDark ? Colors.white : Colors.black, letterSpacing: 1, fontSize: 14)),
-                      trailing: IconButton(
-                        icon: Icon(Icons.delete_outline, color: isDark ? Colors.white.withOpacity(0.24) : Colors.black26),
-                        onPressed: () => d.reference.delete(),
+                Text("КЕРУВАННЯ ТИПАМИ ЗАХОДІВ", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _typeController,
+                        style: TextStyle(color: isDark ? Colors.white : Colors.black),
+                        decoration: InputDecoration(
+                          labelText: "Новий тип заходу",
+                          labelStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38),
+                        ),
                       ),
-                    )).toList(),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: isDark ? Colors.white12 : Colors.black12, foregroundColor: isDark ? Colors.white : Colors.black),
+                      onPressed: () async {
+                        if (_typeController.text.isNotEmpty) {
+                          await FirebaseFirestore.instance.collection('event_types').add({
+                            'name': _typeController.text.trim(),
+                          });
+                          _typeController.clear();
+                        }
+                      },
+                      child: const Text("ДОДАТИ"),
+                    )
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance.collection('event_types').snapshots(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                      return ListView(
+                        children: snapshot.data!.docs.map((d) => ListTile(
+                          title: Text(d['name'].toString().toUpperCase(), style: TextStyle(color: isDark ? Colors.white : Colors.black, letterSpacing: 1, fontSize: 14)),
+                          trailing: IconButton(
+                            icon: Icon(Icons.delete_outline, color: isDark ? Colors.white.withOpacity(0.24) : Colors.black26),
+                            onPressed: () => d.reference.delete(),
+                          ),
+                        )).toList(),
                   );
                 },
               ),
@@ -819,6 +835,8 @@ class _AdminTypesScreenState extends State<AdminTypesScreen> {
         ),
       ),
     );
+  },
+);
   }
 }
 
@@ -839,34 +857,39 @@ class ResidentScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-    Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
-    return Scaffold(
-      backgroundColor: dynamicBg,
-      body: Stack(
-        children: [
-          Positioned(
-            top: 40,
-            right: 20,
-            child: IconButton(
-              icon: Icon(Icons.settings_outlined, color: isDark ? Colors.white24 : Colors.black26, size: 26),
-              onPressed: onOpenSettings,
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (context, currentMode, child) {
+        bool isDark = currentMode == ThemeMode.dark || (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+        Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
+        return Scaffold(
+          backgroundColor: dynamicBg,
+          body: Stack(
+            children: [
+              Positioned(
+                top: 40,
+                right: 20,
+                child: IconButton(
+                  icon: Icon(Icons.settings_outlined, color: isDark ? Colors.white24 : Colors.black26, size: 26),
+                  onPressed: onOpenSettings,
                 ),
               ),
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(name.toUpperCase(), style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 18, letterSpacing: 2, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 10),
-                Text("${points ?? 0} БАЛІВ", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.5) : Colors.black54, fontSize: 15)),
-                const SizedBox(height: 4),
-                Text("КОД: $userCode", style: TextStyle(color: isDark ? Colors.white24 : Colors.black26, fontSize: 12)),
-              ],
-            ),
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(name.toUpperCase(), style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 18, letterSpacing: 2, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 10),
+                    Text("${points ?? 0} БАЛІВ", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.5) : Colors.black54, fontSize: 15)),
+                    const SizedBox(height: 4),
+                    Text("КОД: $userCode", style: TextStyle(color: isDark ? Colors.white24 : Colors.black26, fontSize: 12)),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -876,23 +899,28 @@ class AttacheScreen extends StatelessWidget {
   const AttacheScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-    Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
-    return Scaffold(
-      backgroundColor: dynamicBg,
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('residents').where('role', isEqualTo: 'resident').snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          return ListView(
-            padding: const EdgeInsets.only(top: 100),
-            children: snapshot.data!.docs.map((d) => ListTile(
-              title: Text(d['name'], style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-              subtitle: Text("БАЛИ: ${d['points']}", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38)),
-            )).toList(),
-          );
-        },
-      ),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (context, currentMode, child) {
+        bool isDark = currentMode == ThemeMode.dark || (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+        Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
+        return Scaffold(
+          backgroundColor: dynamicBg,
+          body: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('residents').where('role', isEqualTo: 'resident').snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+              return ListView(
+                padding: const EdgeInsets.only(top: 100),
+                children: snapshot.data!.docs.map((d) => ListTile(
+                  title: Text(d['name'], style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+                  subtitle: Text("БАЛИ: ${d['points']}", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38)),
+                )).toList(),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
