@@ -14,7 +14,6 @@ const firebaseOptions = FirebaseOptions(
   appId: "1:344209174163:web:9aaa3df05e307abd6b2766",
 );
 
-// Глобальний нотифікатор для зміни теми (Першочергово — Світла)
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 
 void main() async {
@@ -27,7 +26,6 @@ void main() async {
   runApp(const MyApp());
 }
 
-// Кастомний ScrollBehavior для підтримки гортання мишкою на ПК
 class AppScrollBehavior extends MaterialScrollBehavior {
   @override
   Set<PointerDeviceKind> get dragDevices => {
@@ -622,6 +620,7 @@ class EventsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 25),
                   
+                  // ПРАВКА 2: Дата та час поруч + поле тривалості заходу
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -985,32 +984,48 @@ class _CreateEventWizardPageState extends State<CreateEventWizardPage> {
           },
         ),
         const SizedBox(height: 30),
+        
+        // ПРАВКА 2: Дата, час та тривалість розташовані поруч
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: isDark ? Colors.white10 : Colors.black12),
-              onPressed: () async {
-                DateTime? picked = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now(),
-                  firstDate: DateTime(2025),
-                  lastDate: DateTime(2030),
-                  locale: const Locale('uk', 'UA'),
-                );
-                if (picked != null) setState(() => _selectedDate = picked);
-              },
-              child: Text(_selectedDate == null ? "ОБРАТИ ДАТУ" : "${_selectedDate!.day}.${_selectedDate!.month}", style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+            Expanded(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: isDark ? Colors.white10 : Colors.black12),
+                onPressed: () async {
+                  DateTime? picked = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(2025),
+                    lastDate: DateTime(2030),
+                    locale: const Locale('uk', 'UA'),
+                  );
+                  if (picked != null) setState(() => _selectedDate = picked);
+                },
+                child: Text(_selectedDate == null ? "ОБРАТИ ДАТУ" : "${_selectedDate!.day}.${_selectedDate!.month}", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 12)),
+              ),
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: isDark ? Colors.white10 : Colors.black12),
-              onPressed: () async {
-                TimeOfDay? picked = await showTimePicker(context: context, initialTime: TimeOfDay.now());
-                if (picked != null) setState(() => _selectedTime = picked);
-              },
-              child: Text(_selectedTime == null ? "ОБРАТИ ЧАС" : _selectedTime!.format(context), style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: isDark ? Colors.white10 : Colors.black12),
+                onPressed: () async {
+                  TimeOfDay? picked = await showTimePicker(context: context, initialTime: TimeOfDay.now());
+                  if (picked != null) setState(() => _selectedTime = picked);
+                },
+                child: Text(_selectedTime == null ? "ОБРАТИ ЧАС" : _selectedTime!.format(context), style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 12)),
+              ),
             ),
           ],
+        ),
+        const SizedBox(height: 15),
+        TextField(
+          controller: _durationController,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          style: TextStyle(color: isDark ? Colors.white : Colors.black),
+          decoration: InputDecoration(
+            labelText: "Тривалість заходу (в годинах, напр: 2.5)",
+            labelStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38, fontSize: 13)
+          ),
         ),
         const SizedBox(height: 40),
         Center(
@@ -1085,7 +1100,6 @@ class _CreateEventWizardPageState extends State<CreateEventWizardPage> {
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(tData['name'] ?? 'Без назви', style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14)),
-                  // ФІКС ПОМИЛКИ 1: Змінено неіснуючий Icons.circle_outline на стандартний Icons.circle
                   trailing: isThis ? const Icon(Icons.check_circle, color: Colors.green) : const Icon(Icons.circle, color: Colors.grey),
                   onTap: () {
                     setState(() {
@@ -1160,6 +1174,7 @@ class _CreateEventWizardPageState extends State<CreateEventWizardPage> {
   }
 }
 
+// ПРАВКА 3: Оновлений 2D Драг-н-Дроп конструктор залів зі столами, стільцями та ресайзом
 class SeatingConstructorPage extends StatefulWidget {
   const SeatingConstructorPage({super.key});
 
@@ -1174,41 +1189,126 @@ class _SeatingConstructorPageState extends State<SeatingConstructorPage> {
   void _addElement(String type, {int maxSeats = 1}) {
     setState(() {
       _constructedElements.add({
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'id': DateTime.now().millisecondsSinceEpoch.toString() + _constructedElements.length.toString(),
         'type': type, 
         'max_seats': maxSeats,
         'registered_tickets': 0, 
+        'x': 50.0 + (_constructedElements.length * 15 % 150), 
+        'y': 120.0 + (_constructedElements.length * 15 % 200),
+        'width': type == 'table' ? 110.0 : 70.0,
+        'height': type == 'table' ? 110.0 : 70.0,
         'label': type == 'single' 
             ? "Місце ${_constructedElements.length + 1}"
-            : type == 'vip' ? "VIP ${_constructedElements.length + 1}" : "Стіл (Max: $maxSeats осіб)",
+            : type == 'vip' ? "VIP ${_constructedElements.length + 1}" : "Стіл ${_constructedElements.length + 1}",
       });
     });
   }
 
   void _showAddTableDialog() {
     bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-    final countController = TextEditingController(text: "3");
+    final countController = TextEditingController(text: "4");
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
-        title: const Text("КІЛЬКІСТЬ СТІЛЬЦІВ БІЛЯ СТОЛУ", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        title: const Text("ДОДАТИ СТІЛ З ОКРЕМІМИ МІСЦЯМИ", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
         content: TextField(
           controller: countController,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(hintText: "Наприклад: 3 або 4"),
+          decoration: const InputDecoration(labelText: "Кількість незалежних стільців"),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("СКАСУВАТИ")),
           TextButton(
             onPressed: () {
-              int val = int.tryParse(countController.text) ?? 3;
+              int val = int.tryParse(countController.text) ?? 4;
               _addElement('table', maxSeats: val);
               Navigator.pop(ctx);
             },
             child: const Text("ДОДАТИ", style: TextStyle(fontWeight: FontWeight.bold)),
           )
         ],
+      ),
+    );
+  }
+
+  void _editElementDialog(Map<String, dynamic> element) {
+    bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+    final labelController = TextEditingController(text: element['label']);
+    double currentWidth = (element['width'] as num?)?.toDouble() ?? 70.0;
+    double currentHeight = (element['height'] as num?)?.toDouble() ?? 70.0;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+          title: Text("РЕДАГУВАННЯ: ${element['type'].toString().toUpperCase()}", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: labelController,
+                  decoration: const InputDecoration(labelText: "Підпис / Номер місця"),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    const Text("Ширина: ", style: TextStyle(fontSize: 12)),
+                    Expanded(
+                      child: Slider(
+                        value: currentWidth,
+                        min: 50,
+                        max: 250,
+                        activeColor: isDark ? Colors.white : Colors.black,
+                        onChanged: (val) => setDialogState(() => currentWidth = val),
+                      ),
+                    ),
+                    Text(currentWidth.toInt().toString(), style: const TextStyle(fontSize: 12)),
+                  ],
+                ),
+                Row(
+                  children: [
+                    const Text("Висота: ", style: TextStyle(fontSize: 12)),
+                    Expanded(
+                      child: Slider(
+                        value: currentHeight,
+                        min: 50,
+                        max: 250,
+                        activeColor: isDark ? Colors.white : Colors.black,
+                        onChanged: (val) => setDialogState(() => currentHeight = val),
+                      ),
+                    ),
+                    Text(currentHeight.toInt().toString(), style: const TextStyle(fontSize: 12)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _constructedElements.removeWhere((e) => e['id'] == element['id']);
+                });
+                Navigator.pop(ctx);
+              },
+              child: const Text("ВИДАТИ", style: TextStyle(color: Colors.redAccent)),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  element['label'] = labelController.text.trim();
+                  element['width'] = currentWidth;
+                  element['height'] = currentHeight;
+                });
+                Navigator.pop(ctx);
+              },
+              child: const Text("ЗБЕРЕГТИ", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1227,7 +1327,7 @@ class _SeatingConstructorPageState extends State<SeatingConstructorPage> {
           icon: Icon(Icons.close, color: isDark ? Colors.white : Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text("КОНСТРУКТОР СХЕМИ РОЗСАДКИ", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14, fontWeight: FontWeight.bold)),
+        title: Text("ВІЗУАЛЬНИЙ КАРТА-КОНСТРУКТОР ЗАЛУ", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 13, fontWeight: FontWeight.bold)),
         actions: [
           TextButton(
             onPressed: () async {
@@ -1240,91 +1340,124 @@ class _SeatingConstructorPageState extends State<SeatingConstructorPage> {
                 if (mounted) Navigator.pop(context);
               }
             },
-            child: const Text("ЗБЕРЕГТИ", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+            child: const Text("ЗБЕРЕГТИ ЗАЛ", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
           )
         ],
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: TextField(
               controller: _templateNameController,
               style: TextStyle(color: isDark ? Colors.white : Colors.black),
               decoration: const InputDecoration(
-                labelText: "НАЗВА ШАБЛОНУ ЗАЛУ",
-                labelStyle: TextStyle(fontSize: 12),
+                labelText: "НАЗВА ШАБЛОНУ СХЕМИ",
+                labelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
               ),
             ),
           ),
           
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             child: Wrap(
-              spacing: 10,
+              spacing: 8,
               children: [
                 ActionChip(
-                  avatar: const Icon(Icons.chair_alt, size: 16),
-                  label: const Text("Одинарне місце"),
+                  avatar: const Icon(Icons.chair_alt, size: 14),
+                  label: const Text("Крісло", style: TextStyle(fontSize: 11)),
                   onPressed: () => _addElement('single'),
                 ),
                 ActionChip(
-                  avatar: const Icon(Icons.table_restaurant, size: 16),
-                  label: const Text("+ Стіл з місцями"),
+                  avatar: const Icon(Icons.table_restaurant, size: 14),
+                  label: const Text("+ Стіл + Місця", style: TextStyle(fontSize: 11)),
                   onPressed: _showAddTableDialog,
                 ),
                 ActionChip(
-                  avatar: const Icon(Icons.stars, size: 16, color: Colors.amber),
-                  label: const Text("VIP місце"),
+                  avatar: const Icon(Icons.stars, size: 14, color: Colors.amber),
+                  label: const Text("VIP", style: TextStyle(fontSize: 11)),
                   onPressed: () => _addElement('vip'),
                 ),
               ],
             ),
           ),
           
-          const SizedBox(height: 15),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 4),
+            child: Text("💡 Перетягуйте об'єкти пальцем/мишкою. Натисніть для редагування чи ресайзу.", style: TextStyle(fontSize: 10, color: Colors.grey)),
+          ),
+
           Expanded(
-            child: _constructedElements.isEmpty 
-              ? Center(child: Text("В залі порожньо. Додайте стільці чи столи!", style: TextStyle(color: isDark ? Colors.white24 : Colors.black26, fontSize: 13)))
-              : GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 1.3
-                  ),
-                  itemCount: _constructedElements.length,
-                  itemBuilder: (ctx, i) {
-                    var el = _constructedElements[i];
-                    Color cardColor = Colors.grey.withOpacity(0.2);
-                    IconData icon = Icons.event_seat;
+            child: Container(
+              margin: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Stack(
+                  children: _constructedElements.map((el) {
+                    double elX = (el['x'] as num?)?.toDouble() ?? 50.0;
+                    double elY = (el['y'] as num?)?.toDouble() ?? 100.0;
+                    double elW = (el['width'] as num?)?.toDouble() ?? 70.0;
+                    double elH = (el['height'] as num?)?.toDouble() ?? 70.0;
+
+                    Color itemColor = Colors.grey.withOpacity(0.15);
+                    IconData icon = Icons.chair_alt;
+                    
                     if (el['type'] == 'vip') {
-                      cardColor = Colors.amber.withOpacity(0.2);
+                      itemColor = Colors.amber.withOpacity(0.15);
                       icon = Icons.star;
                     } else if (el['type'] == 'table') {
-                      cardColor = Colors.blue.withOpacity(0.2);
-                      icon = Icons.blur_circular_rounded;
+                      itemColor = Colors.blue.withOpacity(0.12);
+                      icon = Icons.blur_circular;
                     }
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius: BorderRadius.circular(8),
-                        // ФІКС ПОМИЛКИ 2: Замінено неіснуючий Colors.black10 на Colors.black12
-                        border: Border.all(color: isDark ? Colors.white10 : Colors.black12)
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(icon, size: 18, color: isDark ? Colors.white70 : Colors.black87),
-                          const SizedBox(height: 4),
-                          // ФІКС ПОМИЛКИ 3: Замінено неіснуючий CenterAxisAlignment.center на правильний TextAlign.center
-                          Text(el['label'], style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-                        ],
+
+                    return Positioned(
+                      left: elX,
+                      top: elY,
+                      child: GestureDetector(
+                        onTap: () => _editElementDialog(el),
+                        onPanUpdate: (details) {
+                          setState(() {
+                            el['x'] = elX + details.delta.dx;
+                            el['y'] = elY + details.delta.dy;
+                          });
+                        },
+                        child: Container(
+                          width: elW,
+                          height: elH,
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: itemColor,
+                            borderRadius: BorderRadius.circular(el['type'] == 'table' ? 100 : 12),
+                            border: Border.all(color: isDark ? Colors.white24 : Colors.black26, width: 1.5),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(icon, size: elH > 80 ? 22 : 16, color: isDark ? Colors.white70 : Colors.black87),
+                              const SizedBox(height: 2),
+                              Text(
+                                el['label'], 
+                                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (el['type'] == 'table')
+                                Text("(${el['max_seats']} місць)", style: const TextStyle(fontSize: 8, color: Colors.grey)),
+                            ],
+                          ),
+                        ),
                       ),
                     );
-                  },
+                  }).toList(),
                 ),
+              ),
+            ),
           )
         ],
       ),
@@ -1508,7 +1641,6 @@ class AdminTypesScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              // ФІКС ПОМИЛКИ 4: Оскільки у Card немає параметра opacity, обгортаємо Card в Opacity-віджет
               Opacity(
                 opacity: 0.5,
                 child: Card(
@@ -1530,6 +1662,7 @@ class AdminTypesScreen extends StatelessWidget {
   }
 }
 
+// ПРАВКА 1: Повне редагування наявних категорій прямо зі списку
 class ManageCategoriesFullScreen extends StatelessWidget {
   const ManageCategoriesFullScreen({super.key});
 
@@ -1547,6 +1680,76 @@ class ManageCategoriesFullScreen extends StatelessWidget {
         ],
       ),
     ) ?? false;
+  }
+
+  void _showEditCategoryDialog(BuildContext context, DocumentSnapshot doc, bool isDark) {
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    final nameController = TextEditingController(text: data['name']);
+    final descController = TextEditingController(text: data['description'] ?? '');
+    bool componentSeating = data['has_seating'] ?? false;
+    bool componentMenu = data['has_menu'] ?? false;
+    bool componentStaffCall = data['has_staff_call'] ?? false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text("РЕДАГУВАННЯ КАТЕГОРІЇ", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14, fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: "Назва категорії"),
+                ),
+                TextField(
+                  controller: descController,
+                  decoration: const InputDecoration(labelText: "Опис"),
+                ),
+                const SizedBox(height: 15),
+                CheckboxListTile(
+                  title: const Text("Модуль Розсадки", style: TextStyle(fontSize: 13)),
+                  value: componentSeating,
+                  onChanged: (v) => setDialogState(() => componentSeating = v ?? false),
+                ),
+                CheckboxListTile(
+                  title: const Text("Модуль Меню", style: TextStyle(fontSize: 13)),
+                  value: componentMenu,
+                  onChanged: (v) => setDialogState(() => componentMenu = v ?? false),
+                ),
+                CheckboxListTile(
+                  title: const Text("Виклик Аташе", style: TextStyle(fontSize: 13)),
+                  value: componentStaffCall,
+                  onChanged: (v) => setDialogState(() => componentStaffCall = v ?? false),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("СКАСУВАТИ"),
+            ),
+            TextButton(
+              onPressed: () async {
+                await doc.reference.update({
+                  'name': nameController.text.trim(),
+                  'description': descController.text.trim(),
+                  'has_seating': componentSeating,
+                  'has_menu': componentMenu,
+                  'has_staff_call': componentStaffCall,
+                });
+                Navigator.pop(ctx);
+              },
+              child: const Text("ЗБЕРЕГТИ", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+            )
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -1595,6 +1798,7 @@ class ManageCategoriesFullScreen extends StatelessWidget {
                 margin: const EdgeInsets.only(bottom: 12),
                 elevation: 0,
                 child: ListTile(
+                  onTap: () => _showEditCategoryDialog(context, docs[index], isDark),
                   title: Text(name.toUpperCase(), style: TextStyle(color: isDark ? Colors.white : Colors.black, letterSpacing: 1, fontSize: 14, fontWeight: FontWeight.bold)),
                   subtitle: Text(
                     "Компоненти: [Розсадка: ${hasSeating ? 'Так' : 'Ні'}] [Меню: ${hasMenu ? 'Так' : 'Ні'}] [Виклик: ${hasStaff ? 'Так' : 'Ні'}]",
