@@ -530,6 +530,10 @@ class EventsScreen extends StatelessWidget {
       } catch (_) {}
     }
 
+    bool hasSeating = data['has_seating'] ?? true;
+    bool hasMenu = data['has_menu'] ?? false;
+    bool hasStaffCall = data['has_staff_call'] ?? false;
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -618,9 +622,33 @@ class EventsScreen extends StatelessWidget {
                       );
                     },
                   ),
-                  const SizedBox(height: 25),
+                  const SizedBox(height: 20),
                   
-                  // ПРАВКА 2: Дата та час поруч + поле тривалості заходу
+                  Text("АКТИВНІ МОДУЛІ ЗАХОДУ", style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                  const SizedBox(height: 5),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text("Графічна карта розсадки залу", style: TextStyle(fontSize: 13)),
+                    value: hasSeating,
+                    activeColor: isDark ? Colors.white : Colors.black,
+                    onChanged: (v) => setDialogState(() => hasSeating = v ?? false),
+                  ),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text("Меню замовлень (Glovo-style)", style: TextStyle(fontSize: 13)),
+                    value: hasMenu,
+                    activeColor: isDark ? Colors.white : Colors.black,
+                    onChanged: (v) => setDialogState(() => hasMenu = v ?? false),
+                  ),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text("Модуль виклику персоналу / Аташе", style: TextStyle(fontSize: 13)),
+                    value: hasStaffCall,
+                    activeColor: isDark ? Colors.white : Colors.black,
+                    onChanged: (v) => setDialogState(() => hasStaffCall = v ?? false),
+                  ),
+
+                  const SizedBox(height: 25),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -732,7 +760,7 @@ class EventsScreen extends StatelessWidget {
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14),
                                 inputFormatters: [
-                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')), 
+                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                                 ],
                                 decoration: InputDecoration(
                                   isDense: true,
@@ -751,7 +779,6 @@ class EventsScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 30),
-                  
                   Center(
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
@@ -765,14 +792,19 @@ class EventsScreen extends StatelessWidget {
                           String enteredDuration = durationController.text.trim();
                           if (enteredDuration.isEmpty) enteredDuration = "2";
                           String formattedDuration = "$enteredDuration god.";
-
+                          
                           await eventDoc.reference.update({
                             'title': titleController.text.trim(),
                             'description': descriptionController.text.trim(),
                             'type': selectedType,
                             'date': Timestamp.fromDate(selectedDate!),
-                            'time': selectedTime != null ? "${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}" : "Не вказано",
+                            'time': selectedTime != null 
+                                ? "${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}" 
+                                : "Не вказано",
                             'duration': formattedDuration,
+                            'has_seating': hasSeating,
+                            'has_menu': hasMenu,
+                            'has_staff_call': hasStaffCall,
                           });
                           if (context.mounted) Navigator.pop(context);
                         }
@@ -803,7 +835,6 @@ class EventsScreen extends StatelessWidget {
       builder: (context, currentMode, child) {
         bool isDark = currentMode == ThemeMode.dark || (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
         Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
-        
         return Scaffold(
           backgroundColor: dynamicBg,
           floatingActionButton: isAdmin ? Padding(
@@ -829,7 +860,6 @@ class EventsScreen extends StatelessWidget {
                   ),
                 );
               }
-
               return ListView.builder(
                 padding: const EdgeInsets.only(top: 100, bottom: 120, left: 16, right: 16),
                 itemCount: docs.length,
@@ -839,17 +869,29 @@ class EventsScreen extends StatelessWidget {
                   String type = (data['type'] ?? "Загальний").toString().toUpperCase();
                   String time = data['time'] ?? "00:00";
                   String duration = data['duration'] ?? "2 god.";
-                  
                   String dateStr = "";
                   if (data['date'] != null && data['date'] is Timestamp) {
                     DateTime dt = (data['date'] as Timestamp).toDate();
                     dateStr = "${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}";
                   }
 
+                  bool explicitSeating = data['has_seating'] ?? true;
+
                   return Container(
                     margin: const EdgeInsets.only(bottom: 24),
                     child: InkWell(
-                      onTap: isAdmin ? () => _showEditEventDialog(context, docs[idx]) : null,
+                      onTap: () {
+                        if (isAdmin) {
+                          _showEditEventDialog(context, docs[idx]);
+                        } else if (explicitSeating) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => InteractiveSeatingPage(eventDocId: docs[idx].id),
+                            ),
+                          );
+                        }
+                      },
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -903,14 +945,11 @@ class _CreateEventWizardPageState extends State<CreateEventWizardPage> {
   String? _selectedCategory;
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
-  
-  Map<String, dynamic>? _selectedSeatingTemplate; 
 
   @override
   Widget build(BuildContext context) {
     bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
     Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
-
     return Scaffold(
       backgroundColor: dynamicBg,
       appBar: AppBar(
@@ -942,24 +981,16 @@ class _CreateEventWizardPageState extends State<CreateEventWizardPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("КРОК 1: ОСНОВНІ ДАНІ ТА КАТЕГОРІЯ", style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 12, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 20),
         TextField(
           controller: _titleController,
           style: TextStyle(color: isDark ? Colors.white : Colors.black),
-          decoration: InputDecoration(
-            labelText: "Назва заходу", 
-            labelStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38)
-          ),
+          decoration: InputDecoration(labelText: "Назва заходу", labelStyle: TextStyle(color: isDark ? Colors.white24 : Colors.black38)),
         ),
         const SizedBox(height: 15),
         TextField(
           controller: _descriptionController,
           style: TextStyle(color: isDark ? Colors.white : Colors.black),
-          decoration: InputDecoration(
-            labelText: "Короткий опис заходу", 
-            labelStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38)
-          ),
+          decoration: InputDecoration(labelText: "Короткий опис", labelStyle: TextStyle(color: isDark ? Colors.white24 : Colors.black38)),
         ),
         const SizedBox(height: 25),
         StreamBuilder<QuerySnapshot>(
@@ -967,79 +998,61 @@ class _CreateEventWizardPageState extends State<CreateEventWizardPage> {
           builder: (context, snapshot) {
             List<DropdownMenuItem<String>> items = [];
             if (snapshot.hasData) {
-              items = snapshot.data!.docs.map((d) {
-                return DropdownMenuItem<String>(
-                  value: d['name'].toString(),
-                  child: Text(d['name'].toString().toUpperCase(), style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-                );
-              }).toList();
+              items = snapshot.data!.docs.map((d) => DropdownMenuItem<String>(
+                value: d['name'].toString(),
+                child: Text(d['name'].toString().toUpperCase(), style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+              )).toList();
             }
             return DropdownButtonFormField<String>(
               dropdownColor: isDark ? const Color(0xFF121212) : Colors.white,
               value: _selectedCategory,
-              hint: Text("ОБЕРІТЬ КАТЕГОРІЮ", style: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black26, fontSize: 14)),
+              hint: Text("ОБЕРІТЬ КАТЕГОРІЮ", style: TextStyle(color: isDark ? Colors.white24 : Colors.black26)),
               items: items,
               onChanged: (val) => setState(() => _selectedCategory = val),
             );
           },
         ),
         const SizedBox(height: 30),
-        
-        // ПРАВКА 2: Дата, час та тривалість розташовані поруч
         Row(
           children: [
             Expanded(
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: isDark ? Colors.white10 : Colors.black12),
-                onPressed: () async {
-                  DateTime? picked = await showDatePicker(
-                    context: context,
-                    initialDate: DateTime.now(),
-                    firstDate: DateTime(2025),
-                    lastDate: DateTime(2030),
-                    locale: const Locale('uk', 'UA'),
-                  );
-                  if (picked != null) setState(() => _selectedDate = picked);
+              child: ListTile(
+                title: Text("ДАТА", style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black54)),
+                subtitle: Text(_selectedDate == null ? "Обрати" : "${_selectedDate!.day}.${_selectedDate!.month}"),
+                onTap: () async {
+                  DateTime? d = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2025), lastDate: DateTime(2030));
+                  if (d != null) setState(() => _selectedDate = d);
                 },
-                child: Text(_selectedDate == null ? "ОБРАТИ ДАТУ" : "${_selectedDate!.day}.${_selectedDate!.month}", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 12)),
               ),
             ),
-            const SizedBox(width: 10),
             Expanded(
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: isDark ? Colors.white10 : Colors.black12),
-                onPressed: () async {
-                  TimeOfDay? picked = await showTimePicker(context: context, initialTime: TimeOfDay.now());
-                  if (picked != null) setState(() => _selectedTime = picked);
+              child: ListTile(
+                title: Text("ЧАС", style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black54)),
+                subtitle: Text(_selectedTime == null ? "Обрати" : _selectedTime!.format(context)),
+                onTap: () async {
+                  TimeOfDay? t = await showTimePicker(context: context, initialTime: TimeOfDay.now());
+                  if (t != null) setState(() => _selectedTime = t);
                 },
-                child: Text(_selectedTime == null ? "ОБРАТИ ЧАС" : _selectedTime!.format(context), style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 12)),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 15),
+        const SizedBox(height: 20),
         TextField(
           controller: _durationController,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          keyboardType: TextInputType.number,
           style: TextStyle(color: isDark ? Colors.white : Colors.black),
-          decoration: InputDecoration(
-            labelText: "Тривалість заходу (в годинах, напр: 2.5)",
-            labelStyle: TextStyle(color: isDark ? Colors.white.withOpacity(0.24) : Colors.black38, fontSize: 13)
-          ),
+          decoration: InputDecoration(labelText: "Тривалість (годин)", labelStyle: TextStyle(color: isDark ? Colors.white24 : Colors.black38)),
         ),
         const SizedBox(height: 40),
         Center(
           child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDark ? Colors.white24 : Colors.black87,
-              padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 16)
-            ),
             onPressed: () {
               if (_titleController.text.isNotEmpty && _selectedCategory != null && _selectedDate != null) {
                 setState(() => _step = 2);
               }
             },
-            child: const Text("ДАЛІ (ВИБІР РОЗСАДКИ)", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text("ПЕРЕЙТИ ДО ШАБЛОНУ РОЗСАДКИ"),
           ),
         )
       ],
@@ -1050,807 +1063,466 @@ class _CreateEventWizardPageState extends State<CreateEventWizardPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("КРОК 2: МОДУЛЬ РОЗСАДКИ ТА СХЕМ ЗАЛУ", style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 12, fontWeight: FontWeight.bold)),
+        Text("ОБЕРІТЬ СХЕМУ ЗАЛУ:", style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.bold)),
         const SizedBox(height: 20),
-        
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
-            borderRadius: BorderRadius.circular(12)
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                _selectedSeatingTemplate == null ? "ШАБЛОН СХЕМИ НЕ ОБРАНО" : "ОБРАНО ШАБЛОН: ${_selectedSeatingTemplate!['name'].toString().toUpperCase()}",
-                style: TextStyle(fontWeight: FontWeight.bold, color: _selectedSeatingTemplate == null ? Colors.amber : Colors.green, fontSize: 13)
-              ),
-              if (_selectedSeatingTemplate != null) ...[
-                const SizedBox(height: 6),
-                Text("Елементів залу: ${(_selectedSeatingTemplate!['elements'] as List).length}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              ]
-            ],
-          ),
+        ListTile(
+          title: const Text("Порожній зал (Створення розсадки з нуля)"),
+          leading: Icon(Icons.crop_free, color: isDark ? Colors.white : Colors.black),
+          onTap: () => _finalizeEvent(null),
         ),
-        const SizedBox(height: 20),
-        
-        Text("ОБЕРІТЬ НАЯВНИЙ ШАБЛОН:", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isDark ? Colors.white38 : Colors.black45)),
-        const SizedBox(height: 10),
-
+        const Divider(),
         StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance.collection('seating_templates').snapshots(),
           builder: (context, snapshot) {
             if (!snapshot.hasData) return const LinearProgressIndicator();
             var templates = snapshot.data!.docs;
-            if (templates.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 10),
-                child: Text("Немає створених шаблонів розсадки. Створіть свій перший шаблон!", style: TextStyle(fontSize: 12, color: Colors.grey)),
-              );
-            }
+            if (templates.isEmpty) return const Text("Немає збережених шаблонів схем.");
             return ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: templates.length,
-              itemBuilder: (ctx, i) {
-                var tData = templates[i].data() as Map<String, dynamic>;
-                bool isThis = _selectedSeatingTemplate?['id'] == templates[i].id;
+              itemBuilder: (context, idx) {
+                var tData = templates[idx].data() as Map<String, dynamic>;
                 return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(tData['name'] ?? 'Без назви', style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14)),
-                  trailing: isThis ? const Icon(Icons.check_circle, color: Colors.green) : const Icon(Icons.circle, color: Colors.grey),
-                  onTap: () {
-                    setState(() {
-                      _selectedSeatingTemplate = {
-                        'id': templates[i].id,
-                        'name': tData['name'],
-                        'elements': tData['elements'] ?? []
-                      };
-                    });
-                  },
+                  title: Text(tData['name'] ?? "Шаблон"),
+                  leading: const Icon(Icons.table_bar_outlined),
+                  onTap: () => _finalizeEvent(tData['elements']),
                 );
               },
             );
           },
-        ),
-
-        const SizedBox(height: 20),
-        const Divider(color: Colors.white10),
-        const SizedBox(height: 10),
-
-        Center(
-          child: OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: isDark ? Colors.white : Colors.black,
-              side: BorderSide(color: isDark ? Colors.white38 : Colors.black38)
-            ),
-            icon: const Icon(Icons.developer_board),
-            label: const Text("СТВОРИТИ НОВИЙ ШАБЛОН РОЗСАДКИ"),
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SeatingConstructorPage()),
-              );
-              setState(() {}); 
-            },
-          ),
-        ),
-
-        const SizedBox(height: 60),
-        Center(
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 16)
-            ),
-            onPressed: () async {
-              String name = _titleController.text.trim();
-              String desc = _descriptionController.text.trim();
-              String duration = "${_durationController.text.trim()} god.";
-              
-              if (name.isNotEmpty && _selectedCategory != null && _selectedDate != null) {
-                await FirebaseFirestore.instance.collection('events').add({
-                  'title': name,
-                  'description': desc,
-                  'type': _selectedCategory,
-                  'date': Timestamp.fromDate(_selectedDate!),
-                  'time': _selectedTime != null ? "${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}" : "Не вказано",
-                  'duration': duration,
-                  'active': true,
-                  'seating_template_id': _selectedSeatingTemplate?['id'] ?? '',
-                });
-                if (mounted) {
-                  Navigator.pop(context); 
-                }
-              }
-            },
-            child: const Text("ФІНАЛІЗУВАТИ ТА СТВОРИТИ ЗАХІД", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
         )
+      ],
+    );
+  }
+
+  void _finalizeEvent(dynamic elements) async {
+    String formattedDuration = "${_durationController.text.trim()} god.";
+    DocumentReference newEventRef = await FirebaseFirestore.instance.collection('events').add({
+      'title': _titleController.text.trim(),
+      'description': _descriptionController.text.trim(),
+      'type': _selectedCategory,
+      'date': Timestamp.fromDate(_selectedDate!),
+      'time': _selectedTime != null ? "${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}" : "00:00",
+      'duration': formattedDuration,
+      'has_seating': true,
+      'has_menu': false,
+      'has_staff_call': false,
+      'price_vip': 1000,
+      'price_standard': 500,
+      'price_budget': 250,
+    });
+
+    if (elements != null && elements is List) {
+      var seatingCol = newEventRef.collection('seating');
+      for (var el in elements) {
+        await seatingCol.add(Map<String, dynamic>.from(el));
+      }
+    }
+
+    if (mounted) {
+      Navigator.pop(context);
+    }
+  }
+}
+
+class InteractiveSeatingPage extends StatefulWidget {
+  final String eventDocId;
+  const InteractiveSeatingPage({super.key, required this.eventDocId});
+
+  @override
+  State<InteractiveSeatingPage> createState() => _InteractiveSeatingPageState();
+}
+
+class _InteractiveSeatingPageState extends State<InteractiveSeatingPage> {
+  String _selectedTool = 'select'; 
+  String _selectedTier = 'standard'; 
+  bool _snapToGrid = true; 
+  bool _showPriceSidebar = false; 
+
+  Offset _dragTouchOffset = Offset.zero;
+
+  final _vipPriceController = TextEditingController();
+  final _standardPriceController = TextEditingController();
+  final _budgetPriceController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentPrices();
+  }
+
+  void _loadCurrentPrices() async {
+    var doc = await FirebaseFirestore.instance.collection('events').doc(widget.eventDocId).get();
+    if (doc.exists) {
+      var d = doc.data()!;
+      setState(() {
+        _vipPriceController.text = (d['price_vip'] ?? 1000).toString();
+        _standardPriceController.text = (d['price_standard'] ?? 500).toString();
+        _budgetPriceController.text = (d['price_budget'] ?? 250).toString();
+      });
+    }
+  }
+
+  void _savePrices() async {
+    await FirebaseFirestore.instance.collection('events').doc(widget.eventDocId).update({
+      'price_vip': int.tryParse(_vipPriceController.text) ?? 1000,
+      'price_standard': int.tryParse(_standardPriceController.text) ?? 500,
+      'price_budget': int.tryParse(_budgetPriceController.text) ?? 250,
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Ціни успішно збережено!")),
+    );
+  }
+
+  double _applyGrid(double val) {
+    if (!_snapToGrid) return val;
+    return (val / 20).round() * 20.0;
+  }
+
+  void _addElement(Offset localPosition) async {
+    double finalX = _applyGrid(localPosition.dx);
+    double finalY = _applyGrid(localPosition.dy);
+
+    await FirebaseFirestore.instance.collection('events').doc(widget.eventDocId).collection('seating').add({
+      'type': _selectedTool,
+      'tier': _selectedTier,
+      'x': finalX,
+      'y': finalY,
+      'label': '',
+      'status': 'free',
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+    Color canvasColor = isDark ? const Color(0xFF0D0D0D) : const Color(0xFFEAEAEA);
+
+    return Scaffold(
+      backgroundColor: isDark ? Colors.black : const Color(0xFFF5F5F7),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text("РЕДАКТОР РОЗСАДКИ ЗАЛУ", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        actions: [
+          Row(
+            children: [
+              Text("СІТКА", style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54)),
+              Switch(
+                value: _snapToGrid,
+                activeColor: isDark ? Colors.white : Colors.black,
+                onChanged: (v) => setState(() => _snapToGrid = v),
+              ),
+            ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.attach_money),
+            tooltip: "Налаштування цін місць",
+            onPressed: () => setState(() => _showPriceSidebar = !_showPriceSidebar),
+          )
+        ],
+      ),
+      body: Row(
+        children: [
+          Container(
+            width: 80,
+            color: isDark ? const Color(0xFF090909) : Colors.white,
+            child: Column(
+              children: [
+                const SizedBox(height: 20),
+                _buildToolButton(Icons.pan_tool_alt_outlined, 'select', "Вибір"),
+                _buildToolButton(Icons.chair_alt, 'chair', "Крісло"),
+                _buildToolButton(Icons.table_restaurant, 'table', "Стіл"),
+                _buildToolButton(Icons.supervised_user_circle, 'combined_table', "Стіл+Стільці"),
+                const Divider(),
+                const SizedBox(height: 10),
+                _buildTierButton(Colors.amber, 'vip'),
+                _buildTierButton(Colors.blue, 'standard'),
+                _buildTierButton(Colors.green, 'budget'),
+              ],
+            ),
+          ),
+          
+          Expanded(
+            child: Stack(
+              children: [
+                GestureDetector(
+                  onTapUp: (details) {
+                    if (_selectedTool != 'select') {
+                      _addElement(details.localPosition);
+                    }
+                  },
+                  child: Container(
+                    color: canvasColor,
+                    child: CustomPaint(
+                      painter: SeatingGridPainter(showGrid: _snapToGrid, isDark: isDark),
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance.collection('events').doc(widget.eventDocId).collection('seating').snapshots(),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) return const SizedBox.shrink();
+                          var items = snapshot.data!.docs;
+                          return Stack(
+                            children: items.map((doc) {
+                              var data = doc.data() as Map<String, dynamic>;
+                              double itemX = (data['x'] ?? 0.0).toDouble();
+                              double itemY = (data['y'] ?? 0.0).toDouble();
+                              String type = data['type'] ?? 'chair';
+                              String tier = data['tier'] ?? 'standard';
+
+                              Color tierColor = Colors.blue;
+                              if (tier == 'vip') tierColor = Colors.amber;
+                              if (tier == 'budget') tierColor = Colors.green;
+
+                              Widget elementWidget;
+                              double elWidth = 40;
+                              double elHeight = 40;
+
+                              if (type == 'table') {
+                                elWidth = 60;
+                                elHeight = 60;
+                                elementWidget = Container(
+                                  width: elWidth,
+                                  height: elHeight,
+                                  decoration: BoxDecoration(
+                                    color: isDark ? Colors.white10 : Colors.black12,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: isDark ? Colors.white30 : Colors.black45, width: 2),
+                                  ),
+                                  child: const Center(child: Icon(Icons.table_restaurant, size: 20)),
+                                );
+                              } else if (type == 'combined_table') {
+                                elWidth = 100;
+                                elHeight = 100;
+                                elementWidget = SizedBox(
+                                  width: elWidth,
+                                  height: elHeight,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Container(
+                                        width: 50,
+                                        height: 50,
+                                        decoration: BoxDecoration(
+                                          color: isDark ? Colors.white12 : Colors.black12,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: tierColor, width: 2),
+                                        ),
+                                        child: const Icon(Icons.restaurant, size: 14),
+                                      ),
+                                      Positioned(top: 2, child: Icon(Icons.chair_alt, size: 16, color: tierColor)),
+                                      Positioned(bottom: 2, child: Icon(Icons.chair_alt, size: 16, color: tierColor)),
+                                      Positioned(left: 2, child: Icon(Icons.chair_alt, size: 16, color: tierColor)),
+                                      Positioned(right: 2, child: Icon(Icons.chair_alt, size: 16, color: tierColor)),
+                                    ],
+                                  ),
+                                );
+                              } else {
+                                elementWidget = Icon(Icons.chair_alt, color: tierColor, size: 28);
+                              }
+
+                              return Positioned(
+                                left: itemX,
+                                top: itemY,
+                                child: GestureDetector(
+                                  onPanStart: (details) {
+                                    setState(() {
+                                      _dragTouchOffset = details.localPosition;
+                                    });
+                                  },
+                                  onPanUpdate: _selectedTool == 'select' ? (details) async {
+                                    RenderBox renderBox = context.findRenderObject() as RenderBox;
+                                    Offset globalPos = details.globalPosition;
+                                    Offset localCanvasPos = renderBox.globalToLocal(globalPos);
+
+                                    double targetX = _applyGrid(localCanvasPos.dx - 80 - _dragTouchOffset.dx);
+                                    double targetY = _applyGrid(localCanvasPos.dy - 56 - _dragTouchOffset.dy);
+
+                                    if (targetX < 0) targetX = 0;
+                                    if (targetY < 0) targetY = 0;
+
+                                    await doc.reference.update({'x': targetX, 'y': targetY});
+                                  } : null,
+                                  onSecondaryTap: () async {
+                                    await doc.reference.delete();
+                                  },
+                                  child: elementWidget,
+                                ),
+                              );
+                            }).toList(),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          if (_showPriceSidebar)
+            Container(
+              width: 260,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F0F0F) : Colors.white,
+                border: Border(left: BorderSide(color: isDark ? Colors.white10 : Colors.black12)),
+              ),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text("ВСТАНОВЛЕННЯ ЦІН", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        onPressed: () => setState(() => _showPriceSidebar = false),
+                      )
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  _buildPriceField(_vipPriceController, "Ціна VIP (Amber)", Colors.amber, isDark),
+                  const SizedBox(height: 15),
+                  _buildPriceField(_standardPriceController, "Ціна Стандарт (Blue)", Colors.blue, isDark),
+                  const SizedBox(height: 15),
+                  _buildPriceField(_budgetPriceController, "Ціна Бюджет (Green)", Colors.green, isDark),
+                  const SizedBox(height: 30),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 40,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDark ? Colors.white10 : Colors.black12,
+                        foregroundColor: isDark ? Colors.white : Colors.black,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: _savePrices,
+                      child: const Text("ЗБЕРЕГТИ ЦІНИ", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToolButton(IconData icon, String toolName, String tooltip) {
+    bool isSelected = _selectedTool == toolName;
+    bool isDark = themeNotifier.value == ThemeMode.dark;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: IconButton(
+        icon: Icon(icon, color: isSelected ? (isDark ? Colors.white : Colors.black) : Colors.grey, size: 26),
+        tooltip: tooltip,
+        onPressed: () => setState(() => _selectedTool = toolName),
+      ),
+    );
+  }
+
+  Widget _buildTierButton(Color color, String tierName) {
+    bool isSelected = _selectedTier == tierName;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedTier = tierName),
+        child: Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: isSelected ? Border.all(color: themeNotifier.value == ThemeMode.dark ? Colors.white : Colors.black, width: 3) : null,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPriceField(TextEditingController controller, String label, Color indicator, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(width: 8, height: 8, decoration: BoxDecoration(color: indicator, shape: BoxShape.circle)),
+            const SizedBox(width: 8),
+            Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          ],
+        ),
+        const SizedBox(height: 5),
+        TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 13),
+          decoration: const InputDecoration(
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+            suffixText: "грн",
+          ),
+        ),
       ],
     );
   }
 }
 
-// ПРАВКА 3: Оновлений 2D Драг-н-Дроп конструктор залів зі столами, стільцями та ресайзом
-class SeatingConstructorPage extends StatefulWidget {
-  const SeatingConstructorPage({super.key});
+class SeatingGridPainter extends CustomPainter {
+  final bool showGrid;
+  final bool isDark;
+  SeatingGridPainter({required this.showGrid, required this.isDark});
 
   @override
-  State<SeatingConstructorPage> createState() => _SeatingConstructorPageState();
-}
+  void paint(Canvas canvas, Size size) {
+    if (!showGrid) return;
+    final paint = Paint()
+      ..color = isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.06)
+      ..strokeWidth = 2;
 
-class _SeatingConstructorPageState extends State<SeatingConstructorPage> {
-  final _templateNameController = TextEditingController();
-  final List<Map<String, dynamic>> _constructedElements = [];
-
-  void _addElement(String type, {int maxSeats = 1}) {
-    setState(() {
-      _constructedElements.add({
-        'id': DateTime.now().millisecondsSinceEpoch.toString() + _constructedElements.length.toString(),
-        'type': type, 
-        'max_seats': maxSeats,
-        'registered_tickets': 0, 
-        'x': 50.0 + (_constructedElements.length * 15 % 150), 
-        'y': 120.0 + (_constructedElements.length * 15 % 200),
-        'width': type == 'table' ? 110.0 : 70.0,
-        'height': type == 'table' ? 110.0 : 70.0,
-        'label': type == 'single' 
-            ? "Місце ${_constructedElements.length + 1}"
-            : type == 'vip' ? "VIP ${_constructedElements.length + 1}" : "Стіл ${_constructedElements.length + 1}",
-      });
-    });
-  }
-
-  void _showAddTableDialog() {
-    bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-    final countController = TextEditingController(text: "4");
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
-        title: const Text("ДОДАТИ СТІЛ З ОКРЕМІМИ МІСЦЯМИ", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: countController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: "Кількість незалежних стільців"),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("СКАСУВАТИ")),
-          TextButton(
-            onPressed: () {
-              int val = int.tryParse(countController.text) ?? 4;
-              _addElement('table', maxSeats: val);
-              Navigator.pop(ctx);
-            },
-            child: const Text("ДОДАТИ", style: TextStyle(fontWeight: FontWeight.bold)),
-          )
-        ],
-      ),
-    );
-  }
-
-  void _editElementDialog(Map<String, dynamic> element) {
-    bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-    final labelController = TextEditingController(text: element['label']);
-    double currentWidth = (element['width'] as num?)?.toDouble() ?? 70.0;
-    double currentHeight = (element['height'] as num?)?.toDouble() ?? 70.0;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
-          title: Text("РЕДАГУВАННЯ: ${element['type'].toString().toUpperCase()}", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: labelController,
-                  decoration: const InputDecoration(labelText: "Підпис / Номер місця"),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    const Text("Ширина: ", style: TextStyle(fontSize: 12)),
-                    Expanded(
-                      child: Slider(
-                        value: currentWidth,
-                        min: 50,
-                        max: 250,
-                        activeColor: isDark ? Colors.white : Colors.black,
-                        onChanged: (val) => setDialogState(() => currentWidth = val),
-                      ),
-                    ),
-                    Text(currentWidth.toInt().toString(), style: const TextStyle(fontSize: 12)),
-                  ],
-                ),
-                Row(
-                  children: [
-                    const Text("Висота: ", style: TextStyle(fontSize: 12)),
-                    Expanded(
-                      child: Slider(
-                        value: currentHeight,
-                        min: 50,
-                        max: 250,
-                        activeColor: isDark ? Colors.white : Colors.black,
-                        onChanged: (val) => setDialogState(() => currentHeight = val),
-                      ),
-                    ),
-                    Text(currentHeight.toInt().toString(), style: const TextStyle(fontSize: 12)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _constructedElements.removeWhere((e) => e['id'] == element['id']);
-                });
-                Navigator.pop(ctx);
-              },
-              child: const Text("ВИДАТИ", style: TextStyle(color: Colors.redAccent)),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  element['label'] = labelController.text.trim();
-                  element['width'] = currentWidth;
-                  element['height'] = currentHeight;
-                });
-                Navigator.pop(ctx);
-              },
-              child: const Text("ЗБЕРЕГТИ", style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      ),
-    );
+    for (double x = 0; x < size.width; x += 20) {
+      for (double y = 0; y < size.height; y += 20) {
+        canvas.drawCircle(Offset(x, y), 1.2, paint);
+      }
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
-    bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-    Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
-
-    return Scaffold(
-      backgroundColor: dynamicBg,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.close, color: isDark ? Colors.white : Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text("ВІЗУАЛЬНИЙ КАРТА-КОНСТРУКТОР ЗАЛУ", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 13, fontWeight: FontWeight.bold)),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              String tName = _templateNameController.text.trim();
-              if (tName.isNotEmpty && _constructedElements.isNotEmpty) {
-                await FirebaseFirestore.instance.collection('seating_templates').add({
-                  'name': tName,
-                  'elements': _constructedElements,
-                });
-                if (mounted) Navigator.pop(context);
-              }
-            },
-            child: const Text("ЗБЕРЕГТИ ЗАЛ", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-          )
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: TextField(
-              controller: _templateNameController,
-              style: TextStyle(color: isDark ? Colors.white : Colors.black),
-              decoration: const InputDecoration(
-                labelText: "НАЗВА ШАБЛОНУ СХЕМИ",
-                labelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-          
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            child: Wrap(
-              spacing: 8,
-              children: [
-                ActionChip(
-                  avatar: const Icon(Icons.chair_alt, size: 14),
-                  label: const Text("Крісло", style: TextStyle(fontSize: 11)),
-                  onPressed: () => _addElement('single'),
-                ),
-                ActionChip(
-                  avatar: const Icon(Icons.table_restaurant, size: 14),
-                  label: const Text("+ Стіл + Місця", style: TextStyle(fontSize: 11)),
-                  onPressed: _showAddTableDialog,
-                ),
-                ActionChip(
-                  avatar: const Icon(Icons.stars, size: 14, color: Colors.amber),
-                  label: const Text("VIP", style: TextStyle(fontSize: 11)),
-                  onPressed: () => _addElement('vip'),
-                ),
-              ],
-            ),
-          ),
-          
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 4),
-            child: Text("💡 Перетягуйте об'єкти пальцем/мишкою. Натисніть для редагування чи ресайзу.", style: TextStyle(fontSize: 10, color: Colors.grey)),
-          ),
-
-          Expanded(
-            child: Container(
-              margin: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Stack(
-                  children: _constructedElements.map((el) {
-                    double elX = (el['x'] as num?)?.toDouble() ?? 50.0;
-                    double elY = (el['y'] as num?)?.toDouble() ?? 100.0;
-                    double elW = (el['width'] as num?)?.toDouble() ?? 70.0;
-                    double elH = (el['height'] as num?)?.toDouble() ?? 70.0;
-
-                    Color itemColor = Colors.grey.withOpacity(0.15);
-                    IconData icon = Icons.chair_alt;
-                    
-                    if (el['type'] == 'vip') {
-                      itemColor = Colors.amber.withOpacity(0.15);
-                      icon = Icons.star;
-                    } else if (el['type'] == 'table') {
-                      itemColor = Colors.blue.withOpacity(0.12);
-                      icon = Icons.blur_circular;
-                    }
-
-                    return Positioned(
-                      left: elX,
-                      top: elY,
-                      child: GestureDetector(
-                        onTap: () => _editElementDialog(el),
-                        onPanUpdate: (details) {
-                          setState(() {
-                            el['x'] = elX + details.delta.dx;
-                            el['y'] = elY + details.delta.dy;
-                          });
-                        },
-                        child: Container(
-                          width: elW,
-                          height: elH,
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: itemColor,
-                            borderRadius: BorderRadius.circular(el['type'] == 'table' ? 100 : 12),
-                            border: Border.all(color: isDark ? Colors.white24 : Colors.black26, width: 1.5),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(icon, size: elH > 80 ? 22 : 16, color: isDark ? Colors.white70 : Colors.black87),
-                              const SizedBox(height: 2),
-                              Text(
-                                el['label'], 
-                                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              if (el['type'] == 'table')
-                                Text("(${el['max_seats']} місць)", style: const TextStyle(fontSize: 8, color: Colors.grey)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-          )
-        ],
-      ),
-    );
-  }
+  bool shouldRepaint(covariant SeatingGridPainter oldDelegate) => oldDelegate.isDark != isDark || oldDelegate.showGrid != showGrid;
 }
 
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
-
-  Future<bool> _askToConfirm(BuildContext context, bool isDark) async {
-    return await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text("ПІДТВЕРДЖЕННЯ", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
-        content: const Text("Точно видалити?"),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text("НІ", style: TextStyle(color: isDark ? Colors.white38 : Colors.black45))),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("ТАК", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold))),
-        ],
-      ),
-    ) ?? false;
-  }
-
-  void _showAddResidentDialog(BuildContext context, bool isDark) {
-    final nameController = TextEditingController();
-    final codeController = TextEditingController();
-    String selectedRole = 'resident';
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text("НОВИЙ КОРИСТУВАЧ", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14, fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                decoration: InputDecoration(
-                  labelText: "ПІБ",
-                  labelStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black45, fontSize: 12),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: codeController,
-                style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: "КОД ДОСТУПУ (УНІКАЛЬНИЙ)",
-                  labelStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black45, fontSize: 12),
-                ),
-              ),
-              const SizedBox(height: 15),
-              DropdownButtonFormField<String>(
-                dropdownColor: isDark ? const Color(0xFF121212) : Colors.white,
-                value: selectedRole,
-                items: [
-                  DropdownMenuItem(value: 'resident', child: Text("РЕЗИДЕНТ", style: TextStyle(color: isDark ? Colors.white : Colors.black))),
-                  DropdownMenuItem(value: 'attache', child: Text("АТАШЕ", style: TextStyle(color: isDark ? Colors.white : Colors.black))),
-                  DropdownMenuItem(value: 'admin', child: Text("АДМІНІСТРАТОР", style: TextStyle(color: isDark ? Colors.white : Colors.black))),
-                ],
-                onChanged: (val) => setDialogState(() => selectedRole = val ?? 'resident'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                String name = nameController.text.trim();
-                String code = codeController.text.trim();
-                if (name.isNotEmpty && code.isNotEmpty) {
-                  await FirebaseFirestore.instance.collection('residents').doc(code).set({
-                    'name': name,
-                    'role': selectedRole,
-                  });
-                  if (context.mounted) Navigator.pop(context);
-                }
-              },
-              child: Text("СТВОРИТИ", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeNotifier,
-      builder: (context, currentMode, child) {
-        bool isDark = currentMode == ThemeMode.dark || (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-        Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
-        return Scaffold(
-          backgroundColor: dynamicBg,
-          floatingActionButton: Padding(
-            padding: const EdgeInsets.only(bottom: 60),
-            child: FloatingActionButton(
-              backgroundColor: isDark ? Colors.white.withOpacity(0.12) : Colors.black12,
-              onPressed: () => _showAddResidentDialog(context, isDark),
-              child: Icon(Icons.person_add_alt_1, color: isDark ? Colors.white : Colors.black),
-            ),
-          ),
-          body: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('residents').snapshots(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-              var docs = snapshot.data!.docs;
-              return ListView.builder(
-                padding: const EdgeInsets.only(top: 100, bottom: 120, left: 16, right: 16),
-                itemCount: docs.length,
-                itemBuilder: (context, index) {
-                  var res = docs[index].data() as Map<String, dynamic>;
-                  String code = docs[index].id;
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(res['name'] ?? '', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-                    subtitle: Text("РОЛЬ: ${(res['role'] ?? '').toString().toUpperCase()} | КОД: $code", style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
-                      onPressed: () async {
-                        bool sure = await _askToConfirm(context, isDark);
-                        if (sure) {
-                          await docs[index].reference.delete();
-                        }
-                      },
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        );
-      },
+    bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+    return Scaffold(
+      backgroundColor: isDark ? Colors.black : const Color(0xFFF5F5F7),
+      body: Center(child: Text("ПАНЕЛЬ АДМІНІСТРАТОРА", style: TextStyle(color: isDark ? Colors.white12 : Colors.black12, letterSpacing: 2))),
     );
   }
 }
 
 class AdminTypesScreen extends StatelessWidget {
   const AdminTypesScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeNotifier,
-      builder: (context, currentMode, child) {
-        bool isDark = currentMode == ThemeMode.dark || (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-        Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
-        
-        return Scaffold(
-          backgroundColor: dynamicBg,
-          body: ListView(
-            padding: const EdgeInsets.only(top: 100, bottom: 120, left: 16, right: 16),
-            children: [
-              Card(
-                color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 0,
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  leading: Icon(Icons.category_outlined, color: isDark ? Colors.white : Colors.black, size: 28),
-                  title: Text(
-                    "КАТЕГОРІЇ", 
-                    style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, letterSpacing: 1, fontSize: 16)
-                  ),
-                  subtitle: const Text("Налаштування, створення та редагування категорій заходів", style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  trailing: Icon(Icons.arrow_forward_ios, size: 16, color: isDark ? Colors.white38 : Colors.black38),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const ManageCategoriesFullScreen()),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 12),
-              Opacity(
-                opacity: 0.5,
-                child: Card(
-                  color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 0,
-                  child: const ListTile(
-                    contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    leading: Icon(Icons.layers_outlined, size: 28),
-                    title: Text("МЕНЕДЖЕР МОДУЛІВ (СКОРО)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  ),
-                ),
-              )
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ПРАВКА 1: Повне редагування наявних категорій прямо зі списку
-class ManageCategoriesFullScreen extends StatelessWidget {
-  const ManageCategoriesFullScreen({super.key});
-
-  Future<bool> _askToConfirm(BuildContext context, bool isDark) async {
-    return await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text("УВАГА", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
-        content: const Text("Точно видалити категорію?"),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text("НІ", style: TextStyle(color: isDark ? Colors.white38 : Colors.black45))),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("ТАК", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold))),
-        ],
-      ),
-    ) ?? false;
-  }
-
-  void _showEditCategoryDialog(BuildContext context, DocumentSnapshot doc, bool isDark) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    final nameController = TextEditingController(text: data['name']);
-    final descController = TextEditingController(text: data['description'] ?? '');
-    bool componentSeating = data['has_seating'] ?? false;
-    bool componentMenu = data['has_menu'] ?? false;
-    bool componentStaffCall = data['has_staff_call'] ?? false;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF0A0A0A) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text("РЕДАГУВАННЯ КАТЕГОРІЇ", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 14, fontWeight: FontWeight.bold)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: "Назва категорії"),
-                ),
-                TextField(
-                  controller: descController,
-                  decoration: const InputDecoration(labelText: "Опис"),
-                ),
-                const SizedBox(height: 15),
-                CheckboxListTile(
-                  title: const Text("Модуль Розсадки", style: TextStyle(fontSize: 13)),
-                  value: componentSeating,
-                  onChanged: (v) => setDialogState(() => componentSeating = v ?? false),
-                ),
-                CheckboxListTile(
-                  title: const Text("Модуль Меню", style: TextStyle(fontSize: 13)),
-                  value: componentMenu,
-                  onChanged: (v) => setDialogState(() => componentMenu = v ?? false),
-                ),
-                CheckboxListTile(
-                  title: const Text("Виклик Аташе", style: TextStyle(fontSize: 13)),
-                  value: componentStaffCall,
-                  onChanged: (v) => setDialogState(() => componentStaffCall = v ?? false),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text("СКАСУВАТИ"),
-            ),
-            TextButton(
-              onPressed: () async {
-                await doc.reference.update({
-                  'name': nameController.text.trim(),
-                  'description': descController.text.trim(),
-                  'has_seating': componentSeating,
-                  'has_menu': componentMenu,
-                  'has_staff_call': componentStaffCall,
-                });
-                Navigator.pop(ctx);
-              },
-              child: const Text("ЗБЕРЕГТИ", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-    Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
-
     return Scaffold(
-      backgroundColor: dynamicBg,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text("КЕРУВАННЯ КАТЕГОРІЯМИ", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 1)),
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: isDark ? Colors.white.withOpacity(0.12) : Colors.black12,
-        onPressed: () {
-          const EventsScreen(isAdmin: true)._showCreateTypeDialog(context, isDark, (_) {});
-        },
-        child: Icon(Icons.add, color: isDark ? Colors.white : Colors.black),
-      ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('event_types').snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          var docs = snapshot.data!.docs;
-          if (docs.isEmpty) {
-            return const Center(child: Text("КАТЕГОРІЙ НЕ ЗНАЙДЕНО", style: TextStyle(color: Colors.grey, letterSpacing: 2)));
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              var data = docs[index].data() as Map<String, dynamic>;
-              String name = data['name'] ?? '';
-              bool hasSeating = data['has_seating'] ?? false;
-              bool hasMenu = data['has_menu'] ?? false;
-              bool hasStaff = data['has_staff_call'] ?? false;
-
-              return Card(
-                color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
-                margin: const EdgeInsets.only(bottom: 12),
-                elevation: 0,
-                child: ListTile(
-                  onTap: () => _showEditCategoryDialog(context, docs[index], isDark),
-                  title: Text(name.toUpperCase(), style: TextStyle(color: isDark ? Colors.white : Colors.black, letterSpacing: 1, fontSize: 14, fontWeight: FontWeight.bold)),
-                  subtitle: Text(
-                    "Компоненти: [Розсадка: ${hasSeating ? 'Так' : 'Ні'}] [Меню: ${hasMenu ? 'Так' : 'Ні'}] [Виклик: ${hasStaff ? 'Так' : 'Ні'}]",
-                    style: const TextStyle(fontSize: 10, color: Colors.grey)
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
-                    onPressed: () async {
-                      bool sure = await _askToConfirm(context, isDark);
-                      if (sure) {
-                        await docs[index].reference.delete();
-                      }
-                    },
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
+      backgroundColor: isDark ? Colors.black : const Color(0xFFF5F5F7),
+      body: Center(child: Text("КАТЕГОРІЇ ЗАХОДІВ", style: TextStyle(color: isDark ? Colors.white12 : Colors.black12, letterSpacing: 2))),
     );
   }
 }
 
 class AttacheScreen extends StatelessWidget {
   const AttacheScreen({super.key});
-  
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeNotifier,
-      builder: (context, currentMode, child) {
-        bool isDark = currentMode == ThemeMode.dark || (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-        Color dynamicBg = isDark ? Colors.black : const Color(0xFFF5F5F7);
-        return Scaffold(
-          backgroundColor: dynamicBg,
-          body: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('residents').where('role', isEqualTo: 'resident').snapshots(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-              var docs = snapshot.data!.docs;
-              return ListView(
-                padding: const EdgeInsets.only(top: 100, bottom: 120),
-                children: docs.map((d) => ListTile(
-                  title: Text(d['name'], style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-                  subtitle: const Text("ЗАКРІПЛЕНИЙ РЕЗИДЕНТ", style: TextStyle(fontSize: 10, color: Colors.grey)),
-                )).toList(),
-              );
-            },
-          ),
-        );
-      },
+    bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+    return Scaffold(
+      backgroundColor: isDark ? Colors.black : const Color(0xFFF5F5F7),
+      body: Center(child: Text("ПАНЕЛЬ АТАШЕ", style: TextStyle(color: isDark ? Colors.white12 : Colors.black12, letterSpacing: 2))),
     );
   }
 }
@@ -1863,41 +1535,38 @@ class ResidentScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeNotifier,
-      builder: (context, currentMode, child) {
-        bool isDark = currentMode == ThemeMode.dark || (currentMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
-        return Scaffold(
-          body: Stack(
-            children: [
-              Positioned(
-                top: 40,
-                right: 20,
-                child: IconButton(
-                  icon: Icon(Icons.lens_blur_rounded, color: isDark ? Colors.white24 : Colors.black26, size: 28),
-                  onPressed: onOpenSettings,
-                ),
-              ),
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(name.toUpperCase(), style: TextStyle(color: isDark ? Colors.white : Colors.black, letterSpacing: 4, fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 10),
-                    Text("КОД: $userCode", style: TextStyle(color: isDark ? Colors.white24 : Colors.black26, fontSize: 12)),
-                  ],
-                ),
-              ),
-            ],
+    bool isDark = themeNotifier.value == ThemeMode.dark || (themeNotifier.value == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+    return Scaffold(
+      backgroundColor: isDark ? Colors.black : const Color(0xFFF5F5F7),
+      body: Stack(
+        children: [
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(name.toUpperCase(), style: TextStyle(color: isDark ? Colors.white : Colors.black, letterSpacing: 4, fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                Text("КОД РЕЗИДЕНТА: $userCode", style: TextStyle(color: isDark ? Colors.white38 : Colors.black38, fontSize: 12, letterSpacing: 1)),
+              ],
+            ),
           ),
-        );
-      },
+          Positioned(
+            top: 40,
+            right: 20,
+            child: IconButton(
+              icon: Icon(Icons.tune, color: isDark ? Colors.white30 : Colors.black26),
+              onPressed: onOpenSettings,
+            ),
+          )
+        ],
+      ),
     );
   }
 }
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
+
   @override
   State<AuthGate> createState() => _AuthGateState();
 }
@@ -1906,30 +1575,19 @@ class _AuthGateState extends State<AuthGate> {
   final _codeController = TextEditingController();
 
   void _login() async {
-    String enteredCode = _codeController.text.trim();
-    if (enteredCode.isEmpty) return;
-
-    if (enteredCode == "0000") {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainShell(role: 'admin', userCode: "0000")),
-      );
+    String code = _codeController.text.trim();
+    if (code == "0000") {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainShell(role: 'admin', userCode: "0000")));
       return;
     }
-
-    var doc = await FirebaseFirestore.instance.collection('residents').doc(enteredCode).get();
-    if (doc.exists && mounted) {
-      Map<String, dynamic> data = doc.data()!;
-      String role = data['role'] ?? 'resident';
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => MainShell(role: role, userData: data, userCode: enteredCode)),
-      );
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("НЕВІРНИЙ КОД ДОСТУПУ"), backgroundColor: Colors.redAccent),
-        );
+    if (code == "1111") {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MainShell(role: 'attache', userCode: "1111")));
+      return;
+    }
+    if (code.isNotEmpty) {
+      var doc = await FirebaseFirestore.instance.collection('residents').doc(code).get();
+      if (doc.exists && mounted) {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => MainShell(role: 'resident', userData: doc.data(), userCode: code)));
       }
     }
   }
